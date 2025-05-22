@@ -1,5 +1,5 @@
 from collectors import price, economic_events, cot_report, sentiment, news
-from signals.engine import generate_trade_signal
+from engine import generate_trade_signal
 from alerts.telegram import send_alert
 from dotenv import load_dotenv
 import os

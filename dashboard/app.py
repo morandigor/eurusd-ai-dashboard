@@ -1,58 +1,72 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
-from signals.engine import generate_trade_signal, get_trend_signal, get_cot_bias, get_sentiment_signal
-import time
+import plotly.graph_objects as go
+import os
+import sys
 
-st.set_page_config(page_title="EUR/USD Dashboard", layout="wide")
+# 👇 Fix path for imports when deployed on Streamlit Cloud
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Auto-refresh every 60 seconds
-st.experimental_set_query_params(_=int(time.time()))
-st.markdown("<meta http-equiv='refresh' content='60'>", unsafe_allow_html=True)
+# 👇 Import signal engine
+from signals.engine import generate_trade_signal, get_trend_signal, get_confidence_level
 
-st.title("💹 EUR/USD Intelligence Dashboard")
+# === PAGE CONFIG ===
+st.set_page_config(
+    page_title="EUR/USD Trading Intelligence",
+    page_icon="📈",
+    layout="wide"
+)
 
-# Signal overview
+# === TITLE ===
+st.markdown("## 💹 EUR/USD Trading Intelligence")
+
+# === SIGNAL ENGINE ===
+try:
+    signal_data = generate_trade_signal()
+    trend = get_trend_signal()
+    confidence = get_confidence_level()
+except Exception as e:
+    st.error(f"❌ Error fetching signals: {e}")
+    st.stop()
+
+# === SIGNAL STATUS ===
 st.subheader("📊 Current Market Signals")
 col1, col2, col3 = st.columns(3)
-col1.metric("Trend Signal", get_trend_signal())
-col2.metric("Smart Money", get_cot_bias())
-col3.metric("Sentiment", get_sentiment_signal())
 
-# Final signal
-signal_data = generate_trade_signal()
+with col1:
+    st.caption("Trend Signal")
+    st.markdown(f"**{trend}**")
 
-if isinstance(signal_data, dict):
-    st.markdown(f"### 🚨 Trade Signal: **{signal_data['signal']}**")
+with col2:
+    st.caption("Smart Money")
+    st.markdown(f"**{confidence}**")
+
+with col3:
+    st.caption("Sentiment")
+    st.markdown(f"**{signal_data.get('sentiment', 'Unknown')}**")
+
+# === TRADE DECISION ===
+trade_signal = signal_data.get("signal", "WAIT / NO CLEAR EDGE")
+st.markdown(f"### 🔴 Trade Signal: ⏸️ {trade_signal}")
+
+# === CHART ===
+st.subheader("📉 EUR/USD Price Chart")
+
+price_data = signal_data.get("price_data", pd.DataFrame())
+
+if not price_data.empty:
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=price_data['datetime'], y=price_data['close'], mode='lines', name='EUR/USD'))
+    fig.update_layout(
+        xaxis_title='Time',
+        yaxis_title='Price',
+        margin=dict(l=0, r=0, t=10, b=10),
+        height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
 else:
-    st.markdown(f"### 🚨 Trade Signal: **{signal_data}**")
+    st.warning("⚠️ No price data available.")
 
-# Price chart with SL/TP
-st.subheader("📈 EUR/USD Price Chart")
-conn = sqlite3.connect("db/database.db")
-prices = pd.read_sql("SELECT * FROM eurusd_prices ORDER BY timestamp DESC LIMIT 100", conn)
-conn.close()
-prices = prices.sort_values("timestamp")
-st.line_chart(prices.set_index("timestamp")["close"])
-
-# SL/TP overlay chart
-if isinstance(signal_data, dict):
-    entry = signal_data["entry"]
-    tp = signal_data["tp"]
-    sl = signal_data["sl"]
-    overlay_df = pd.DataFrame({
-        "Entry": [entry] * len(prices),
-        "TP": [tp] * len(prices),
-        "SL": [sl] * len(prices)
-    }, index=prices["timestamp"])
-    st.line_chart(overlay_df)
-
-# Economic events table
-st.subheader("📅 Economic Events")
-conn = sqlite3.connect("db/database.db")
-events = pd.read_sql("SELECT * FROM economic_events ORDER BY timestamp DESC LIMIT 10", conn)
-conn.close()
-st.table(events)
-
-st.markdown("---")
-st.caption("Built with 💼 by MrDin's EUR/USD AI Engine")
+# === AUTO-REFRESH ===
+st.experimental_set_query_params()
+st.experimental_rerun()

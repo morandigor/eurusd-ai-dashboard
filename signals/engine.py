@@ -1,72 +1,87 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
 import os
 import requests
-import pandas as pd
+from datetime import datetime
 
-# Telegram Config (from Streamlit secrets)
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
+st.title("📊 EUR/USD Trading Intelligence Dashboard")
+
+# --- Telegram Config ---
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+API_KEY = os.getenv("TWELVE_DATA_API_KEY")
 
-def send_telegram_message(message):
+# --- Constants ---
+TICKER = "EUR/USD"
+INTERVAL = "1day"
+LIMIT = 5
+
+
+def send_telegram_alert(message):
     if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-        try:
-            requests.post(url, json=payload)
-        except Exception as e:
-            print(f"Telegram alert failed: {e}")
+        requests.post(url, data=payload)
 
-def fetch_eurusd_data():
-    api_key = os.getenv("TWELVE_DATA_API_KEY")
-    url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1day&outputsize=30&apikey={api_key}"
+
+def fetch_price_data():
+    url = f"https://api.twelvedata.com/time_series?symbol={TICKER}&interval={INTERVAL}&apikey={API_KEY}&outputsize={LIMIT}"
     response = requests.get(url)
     data = response.json()
 
     if "values" not in data:
-        raise ValueError("Invalid data from Twelve Data API")
+        raise ValueError("Invalid data returned from Twelve Data API")
 
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
-    df["close"] = pd.to_numeric(df["close"])
-    df = df.sort_values("datetime").reset_index(drop=True)
-    return df
+    df["close"] = df["close"].astype(float)
+    return df.sort_values("datetime").set_index("datetime")
+
 
 def get_trend_signal(df):
-    df["sma_3"] = df["close"].rolling(3).mean()
-    df["sma_5"] = df["close"].rolling(5).mean()
-    if df["sma_3"].iloc[-1] > df["sma_5"].iloc[-1]:
+    if df["close"].iloc[-1] > df["close"].mean():
         return "BUY"
-    elif df["sma_3"].iloc[-1] < df["sma_5"].iloc[-1]:
+    elif df["close"].iloc[-1] < df["close"].mean():
         return "SELL"
     return "NEUTRAL"
+
 
 def get_sentiment_signal(df):
-    if df["close"].iloc[-1] > df["close"].iloc[-2]:
+    change = df["close"].pct_change().iloc[-1]
+    if change > 0.002:
         return "BUY"
-    elif df["close"].iloc[-1] < df["close"].iloc[-2]:
+    elif change < -0.002:
         return "SELL"
     return "NEUTRAL"
 
-def generate_trade_signal(trend, sentiment):
-    return trend if trend == sentiment else "NEUTRAL"
 
-def calculate_sl_tp(last_price, direction):
-    if direction == "BUY":
-        return round(last_price * 0.995, 5), round(last_price * 1.005, 5)
-    elif direction == "SELL":
-        return round(last_price * 1.005, 5), round(last_price * 0.995, 5)
-    return None, None
+def calculate_sl_tp(current_price):
+    sl = round(current_price * 0.997, 5)  # -0.3%
+    tp = round(current_price * 1.003, 5)  # +0.3%
+    return sl, tp
 
-def evaluate_and_alert():
-    df = fetch_eurusd_data()
+
+def run_signal_engine():
+    df = fetch_price_data()
     trend = get_trend_signal(df)
     sentiment = get_sentiment_signal(df)
-    final_signal = generate_trade_signal(trend, sentiment)
+    current_price = df["close"].iloc[-1]
+    final_signal = trend if trend == sentiment else "NEUTRAL"
 
-    last_price = df["close"].iloc[-1]
-    sl, tp = calculate_sl_tp(last_price, final_signal)
+    sl, tp = calculate_sl_tp(current_price)
 
     if final_signal in ["BUY", "SELL"]:
-        msg = f"🚨 EUR/USD Signal: {final_signal}\nEntry: {last_price}\nSL: {sl}\nTP: {tp}"
-        send_telegram_message(msg)
+        alert_msg = f"\ud83d\udea8 EUR/USD Signal: {final_signal}\nPrice: {current_price}\nSL: {sl}\nTP: {tp}"
+        send_telegram_alert(alert_msg)
 
-    return trend, sentiment, final_signal, df
+    return {
+        "chart": df,
+        "trend": trend,
+        "sentiment": sentiment,
+        "final": final_signal,
+        "stop_loss": sl,
+        "take_profit": tp,
+        "error": None
+    }

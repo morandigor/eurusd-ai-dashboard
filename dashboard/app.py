@@ -22,9 +22,8 @@ st.title("📊 EUR/USD Trading Intelligence Dashboard")
 
 # Generate data
 trend = get_trend_signal()
-smart_money = get_smart_money_signal()
 sentiment = get_sentiment_signal()
-final_signal = generate_trade_signal(trend, smart_money, sentiment)
+final_signal = generate_trade_signal(trend, sentiment)  # remove smart_money
 
 # Display results
 st.subheader("🧠 Analysis Overview")

@@ -1,14 +1,16 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import os
 import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 # 👇 Fix path for imports when deployed on Streamlit Cloud
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # 👇 Import signal engine
-from signals.engine import generate_trade_signal, get_trend_signal, get_confidence_level
+from signals.engine import generate_trade_signal, get_trend_signal, get_combined_signal
 
 # === PAGE CONFIG ===
 st.set_page_config(

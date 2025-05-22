@@ -13,7 +13,6 @@ if PROJECT_ROOT not in sys.path:
 from signals.engine import (
     generate_trade_signal,
     get_trend_signal,
-    get_smart_money_signal,
     get_sentiment_signal,
 )
 

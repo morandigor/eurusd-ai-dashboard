@@ -1,10 +1,8 @@
 import os
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
-import pytz
 
-# Telegram Config (you must set these in Streamlit secrets)
+# Telegram Config (from Streamlit secrets)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -24,7 +22,7 @@ def fetch_eurusd_data():
     data = response.json()
 
     if "values" not in data:
-        raise ValueError("Invalid data returned from Twelve Data API")
+        raise ValueError("Invalid data from Twelve Data API")
 
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
@@ -33,9 +31,8 @@ def fetch_eurusd_data():
     return df
 
 def get_trend_signal(df):
-    df["sma_3"] = df["close"].rolling(window=3).mean()
-    df["sma_5"] = df["close"].rolling(window=5).mean()
-
+    df["sma_3"] = df["close"].rolling(3).mean()
+    df["sma_5"] = df["close"].rolling(5).mean()
     if df["sma_3"].iloc[-1] > df["sma_5"].iloc[-1]:
         return "BUY"
     elif df["sma_3"].iloc[-1] < df["sma_5"].iloc[-1]:
@@ -50,20 +47,14 @@ def get_sentiment_signal(df):
     return "NEUTRAL"
 
 def generate_trade_signal(trend, sentiment):
-    if trend == sentiment:
-        return trend
-    return "NEUTRAL"
+    return trend if trend == sentiment else "NEUTRAL"
 
-def calculate_sl_tp(last_close, direction):
+def calculate_sl_tp(last_price, direction):
     if direction == "BUY":
-        sl = round(last_close * 0.995, 5)
-        tp = round(last_close * 1.005, 5)
+        return round(last_price * 0.995, 5), round(last_price * 1.005, 5)
     elif direction == "SELL":
-        sl = round(last_close * 1.005, 5)
-        tp = round(last_close * 0.995, 5)
-    else:
-        sl = tp = None
-    return sl, tp
+        return round(last_price * 1.005, 5), round(last_price * 0.995, 5)
+    return None, None
 
 def evaluate_and_alert():
     df = fetch_eurusd_data()

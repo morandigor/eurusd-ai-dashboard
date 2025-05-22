@@ -1,8 +1,15 @@
+import os
 import streamlit as st
+import sys
+from pathlib import Path
+
+# Ensure base path is included
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT_DIR))
+
 from signals import engine
 
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
-
 st.title("📊 EUR/USD Trading Intelligence Dashboard")
 
 try:

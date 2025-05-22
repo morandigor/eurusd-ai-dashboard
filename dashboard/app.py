@@ -1,44 +1,42 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from signals import engine
+import engine
 
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 st.title("📊 EUR/USD Trading Intelligence Dashboard")
 
 try:
-    # Run signal engine
-    result = engine.run_signal_engine()
+    df = engine.fetch_eurusd_data()
+    st.success("✅ Data fetched successfully")
 
-    if result['trend'] and result['sentiment']:
-        st.success("✅ Data fetched successfully")
+    trend = engine.get_trend_signal(df)
+    sentiment = engine.get_sentiment_signal(df)
+    final_signal = engine.generate_trade_signal(trend, sentiment)
 
-        # Display breakdown
-        st.subheader("🔍 Signal Breakdown")
+    # Optionally define SL/TP (example: recent high/low)
+    sl = round(df["close"].iloc[-1] - 0.0010, 5)
+    tp = round(df["close"].iloc[-1] + 0.0020, 5)
 
-        col1, col2, col3 = st.columns(3)
+    # Send alert
+    engine.send_telegram_alert(final_signal, sl=sl, tp=tp)
 
-        with col1:
-            st.markdown("### 📉 Trend")
-            st.write(result['trend'])
+    # === Layout ===
+    st.header("🔍 Signal Breakdown")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("📉 **Trend**")
+        st.subheader(trend)
+    with col2:
+        st.markdown("🧠 **Sentiment**")
+        st.subheader(sentiment)
+    with col3:
+        st.markdown("🚦 **Final Signal**")
+        st.subheader(final_signal)
 
-        with col2:
-            st.markdown("### 🧠 Sentiment")
-            st.write(result['sentiment'])
-
-        with col3:
-            st.markdown("### 📟 Final Signal")
-            st.write(result['final'])
-
-        # Plot
-        st.subheader("📈 EUR/USD Close Price (Last 5 Days)")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=result['chart'].index, y=result['chart']['close'], mode='lines+markers'))
-        fig.update_layout(margin=dict(l=10, r=10, t=30, b=20), height=400)
-        st.plotly_chart(fig, use_container_width=True)
-
-    else:
-        st.error("⚠️ Could not fetch signals properly.")
+    # === Chart ===
+    st.subheader("📈 EUR/USD Close Price (Last 5 Days)")
+    recent = df[df["datetime"] > pd.Timestamp.now() - pd.Timedelta(days=5)]
+    st.line_chart(recent.set_index("datetime")["close"])
 
 except Exception as e:
     st.error(f"❌ Failed to load dashboard: {str(e)}")

@@ -1,74 +1,47 @@
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
+import pandas as pd
 import sys
 import os
+
+# Add parent directory to sys.path so Streamlit Cloud can find 'signals'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-
-# 👇 Fix path for imports when deployed on Streamlit Cloud
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# 👇 Import signal engine
-from signals.engine import generate_trade_signal, get_trend_signal, get_combined_signal
-
-# === PAGE CONFIG ===
-st.set_page_config(
-    page_title="EUR/USD Trading Intelligence",
-    page_icon="📈",
-    layout="wide"
+from signals.engine import (
+    generate_trade_signal,
+    get_trend_signal,
+    get_smart_money_signal,
+    get_sentiment_signal,
 )
 
-# === TITLE ===
-st.markdown("## 💹 EUR/USD Trading Intelligence")
+# Streamlit App
+st.set_page_config(layout="wide", page_title="EUR/USD Trading Intelligence")
 
-# === SIGNAL ENGINE ===
-try:
-    signal_data = generate_trade_signal()
-    trend = get_trend_signal()
-    confidence = get_confidence_level()
-except Exception as e:
-    st.error(f"❌ Error fetching signals: {e}")
-    st.stop()
+st.title("📈 EUR/USD Trading Intelligence")
 
-# === SIGNAL STATUS ===
+# Load and display signals
+trend = get_trend_signal()
+smart_money = get_smart_money_signal()
+sentiment = get_sentiment_signal()
+trade_signal = generate_trade_signal(trend, smart_money, sentiment)
+
+# Display current signals
 st.subheader("📊 Current Market Signals")
 col1, col2, col3 = st.columns(3)
+col1.metric("Trend Signal", trend)
+col2.metric("Smart Money", smart_money)
+col3.metric("Sentiment", sentiment)
 
-with col1:
-    st.caption("Trend Signal")
-    st.markdown(f"**{trend}**")
+# Trade signal
+st.subheader("🚨 Trade Signal")
+st.markdown(f"### {trade_signal}")
 
-with col2:
-    st.caption("Smart Money")
-    st.markdown(f"**{confidence}**")
-
-with col3:
-    st.caption("Sentiment")
-    st.markdown(f"**{signal_data.get('sentiment', 'Unknown')}**")
-
-# === TRADE DECISION ===
-trade_signal = signal_data.get("signal", "WAIT / NO CLEAR EDGE")
-st.markdown(f"### 🔴 Trade Signal: ⏸️ {trade_signal}")
-
-# === CHART ===
+# Sample dummy chart
 st.subheader("📉 EUR/USD Price Chart")
-
-price_data = signal_data.get("price_data", pd.DataFrame())
-
-if not price_data.empty:
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=price_data['datetime'], y=price_data['close'], mode='lines', name='EUR/USD'))
-    fig.update_layout(
-        xaxis_title='Time',
-        yaxis_title='Price',
-        margin=dict(l=0, r=0, t=10, b=10),
-        height=400
-    )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.warning("⚠️ No price data available.")
-
-# === AUTO-REFRESH ===
-st.experimental_set_query_params()
-st.experimental_rerun()
+df = pd.DataFrame({
+    "time": pd.date_range(end=pd.Timestamp.now(), periods=20, freq="H"),
+    "price": [1.08 + 0.002 * i for i in range(20)]
+})
+fig = go.Figure(data=[go.Scatter(x=df["time"], y=df["price"], mode="lines", name="EUR/USD")])
+fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+st.plotly_chart(fig, use_container_width=True)

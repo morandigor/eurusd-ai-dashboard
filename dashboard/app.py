@@ -1,55 +1,32 @@
 import streamlit as st
-import plotly.graph_objects as go
-import os
-import sys
+from signals import engine
 
-# === Ensure local imports work ===
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
-sys.path.append(PROJECT_ROOT)
+st.set_page_config(page_title="EUR/USD Trading Intelligence Dashboard")
+st.title("\ud83d\udcca EUR/USD Trading Intelligence Dashboard")
 
-from signals.engine import (
-    fetch_price_data,
-    get_trend_signal,
-    get_sentiment_signal,
-    generate_trade_signal,
-    send_alert,
-)
-
-# === Streamlit UI Setup ===
-st.set_page_config(page_title="EUR/USD TradeIntel AI", layout="wide")
-st.title("📊 EUR/USD Trading Intelligence Dashboard")
-
-# === Fetch and process data ===
 try:
-    df = fetch_price_data()
-    st.success("✅ Data fetched successfully")
+    df = engine.fetch_data()
+    st.success("\u2705 Data fetched successfully")
 
-    trend = get_trend_signal(df)
-    sentiment = get_sentiment_signal()
-    signal = generate_trade_signal(trend, sentiment)
+    trend = engine.get_trend_signal(df)
+    sentiment = engine.get_sentiment_signal(df)
+    final_signal = engine.generate_trade_signal(trend, sentiment)
 
-    # === Display signals ===
-    st.subheader("🔍 Signal Breakdown")
+    # SL and TP logic
+    entry_price = df["close"].iloc[-1]
+    sl = round(entry_price * 0.995, 5)
+    tp = round(entry_price * 1.005, 5)
+
+    engine.send_telegram_alert(final_signal, entry_price, sl, tp)
+
+    st.subheader("\ud83d\udd0d Signal Breakdown")
     col1, col2, col3 = st.columns(3)
-    col1.metric("📈 Trend", trend)
-    col2.metric("🧠 Sentiment", sentiment)
-    col3.metric("🚦 Final Signal", signal)
+    col1.metric("\ud83d\udece\ufe0f Trend", trend)
+    col2.metric("\ud83d\udc8e Sentiment", sentiment)
+    col3.metric("\ud83d\udd39 Final Signal", final_signal)
 
-    # === Chart ===
-    st.subheader("📉 EUR/USD Close Price (Last 5 Days)")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df["datetime"],
-        y=df["close"],
-        mode="lines+markers",
-        name="EUR/USD"
-    ))
-    fig.update_layout(template="plotly_dark", height=400)
-    st.plotly_chart(fig, use_container_width=True)
-
-    # === Telegram Alert ===
-    send_alert(f"🚨 TradeIntel Signal: {signal} | Trend: {trend}, Sentiment: {sentiment}")
+    st.subheader("\ud83d\udd3c EUR/USD Close Price (Last 5 Days)")
+    st.line_chart(df.set_index("datetime")["close"])
 
 except Exception as e:
-    st.error(f"❌ Failed to load dashboard: {str(e)}")
+    st.error(f"\u274c Failed to load dashboard: {e}")

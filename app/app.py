@@ -35,10 +35,12 @@ manual_override = st.sidebar.selectbox("Override Final Signal", ["None", "BUY", 
 
 # Fetch and display data
 df = fetch_eurusd_data()
-price = df['price'].iloc[-1]
-trend_signal = get_trend_signal(df)
-sentiment_signal = get_sentiment_signal(df)
-final_signal = generate_trade_signal(trend_signal, sentiment_signal)
+st.write("🔍 Data Preview", df)  # This line will show you the actual structure of the dataframe
+
+# Confirm the column name
+price = df['correct_column_name'].iloc[-1]  # replace with the actual column
+
+
 
 # Apply override if any
 if manual_override != "None":

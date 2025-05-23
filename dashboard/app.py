@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from dashboard.engine import (
+from engine import (
     fetch_eurusd_data,
     get_trend_signal,
     get_sentiment_signal,

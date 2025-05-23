@@ -1,57 +1,51 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objs as go
+import plotly.graph_objects as go
+from engine import generate_trade_signal, log_signal
+import datetime
+import requests
 import os
-import sys
+from dotenv import load_dotenv
 
-# ✅ Add parent directory to sys.path so we can import engine
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PARENT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
-sys.path.append(PARENT_DIR)
+load_dotenv()
 
-import engine
+API_KEY = os.getenv("TWELVE_DATA_API_KEY")
 
-# === Streamlit setup ===
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
-st.title("📊 EUR/USD Trading Intelligence Dashboard")
+st.set_page_config(page_title="EUR/USD Trading Intelligence Dashboard", layout="wide")
+st.title("\U0001F4CA EUR/USD Trading Intelligence Dashboard")
 
-try:
-    # === Fetch data ===
-    df = engine.fetch_eurusd_data()
-    st.success("✅ Data fetched successfully")
+@st.cache_data
+def fetch_eurusd_data():
+    url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1h&apikey={API_KEY}&outputsize=120"
+    response = requests.get(url)
+    data = response.json()
+    df = pd.DataFrame(data['values'])
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    df = df.sort_values("datetime")
+    df[['open', 'high', 'low', 'close']] = df[['open', 'high', 'low', 'close']].astype(float)
+    return df
 
-    # === Generate signals ===
-    trend = engine.get_trend_signal(df)
-    sentiment = engine.get_sentiment_signal(df)
-    final_signal = engine.generate_trade_signal(trend, sentiment)
+df = fetch_eurusd_data()
 
-    # === Risk management: SL/TP ===
-    current_price = df["close"].iloc[-1]
-    stop_loss = round(current_price * 0.995, 5)  # SL 0.5% below
-    take_profit = round(current_price * 1.01, 5)  # TP 1% above
+# Signal Generation
+signal, sl, tp = generate_trade_signal(df)
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+log_signal(timestamp, signal, sl, tp)
 
-    # === Telegram alert ===
-    engine.send_telegram_alert(signal=final_signal, stop_loss=stop_loss, take_profit=take_profit)
+# Display Dashboard
+st.success("\u2705 Data fetched successfully")
 
-    # === Display signals ===
-    st.subheader("🔍 Signal Breakdown")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("📉 Trend", trend)
-    col2.metric("🧠 Sentiment", sentiment)
-    col3.metric("🚦 Final Signal", final_signal)
+st.subheader("\U0001F50D Signal Breakdown")
+st.markdown(f"**\U0001F4CB Trend**\n{get_trend_signal(df)}")
+st.markdown(f"**\U0001F9E0 Sentiment**\n{get_sentiment_signal(df)}")
+st.markdown(f"**\U0001F4E1 Final Signal**\n{signal}")
 
-    # === Display chart ===
-    st.subheader("📈 EUR/USD Price (Last 5 Days)")
-    df_filtered = df[df["datetime"] > pd.Timestamp.now() - pd.Timedelta(days=5)]
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df_filtered["datetime"], y=df_filtered["close"], mode="lines+markers"))
-    fig.update_layout(xaxis_title="Date", yaxis_title="Price", height=400)
-    st.plotly_chart(fig, use_container_width=True)
+st.subheader("\U0001F4C8 EUR/USD Price (Last 5 Days)")
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df['datetime'], y=df['close'], mode='lines+markers', name='Close'))
+fig.update_layout(xaxis_title='Date', yaxis_title='Price')
+st.plotly_chart(fig, use_container_width=True)
 
-    # === Show SL/TP ===
-    st.subheader("🎯 SL/TP Levels")
-    st.metric("Stop Loss", stop_loss)
-    st.metric("Take Profit", take_profit)
-
-except Exception as e:
-    st.error(f"❌ Error loading dashboard: {str(e)}")
+st.subheader("\U0001F3AF SL/TP Levels")
+st.metric("Stop Loss", sl)
+st.metric("Take Profit", tp)

@@ -1,7 +1,9 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import streamlit as st
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
-import os
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime

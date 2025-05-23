@@ -1,8 +1,7 @@
-import streamlit as st
+import streamlit as st  # ✅ FIRST import
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # ✅ FIRST Streamlit command
 
-# 🛠 THIS MUST BE FIRST STREAMLIT COMMAND
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
-
+# Then import everything else
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
@@ -17,7 +16,6 @@ from engine import (
 
 # App Title
 st.title("📊 EUR/USD Trading Intelligence Dashboard")
-
 
 
 

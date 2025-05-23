@@ -1,71 +1,70 @@
+import csv
 import os
-import requests
 import pandas as pd
+import requests
+from datetime import datetime
 from dotenv import load_dotenv
-from telegram import Bot
 
-# Load environment variables from .env
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-TWELVE_API_KEY = os.getenv("TWELVE_DATA_API_KEY")
+LOG_PATH = "db/signals_log.csv"
 
-# 1. Fetch data from Twelve Data API
 def fetch_eurusd_data():
-    url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1h&outputsize=100&apikey={TWELVE_API_KEY}"
+    url = "https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1h&apikey=" + os.getenv("TWELVE_DATA_API_KEY")
     response = requests.get(url)
     data = response.json()
-
-    if "values" not in data:
-        raise ValueError("Invalid data returned from Twelve Data API")
-
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime")
-    df = df.astype({"open": float, "high": float, "low": float, "close": float})
+    df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].astype(float)
     return df
 
-# 2. Trend signal (based on close vs open)
 def get_trend_signal(df):
-    return "BUY" if df["close"].iloc[-1] > df["open"].iloc[0] else "SELL" if df["close"].iloc[-1] < df["open"].iloc[0] else "NEUTRAL"
+    recent_change = df["close"].pct_change().iloc[-5:].sum()
+    return "BUY" if recent_change > 0 else "SELL"
 
-# 3. Sentiment signal (based on average close vs average open)
-def get_sentiment_signal(df):
-    avg_close = df["close"].mean()
-    avg_open = df["open"].mean()
-    return "BUY" if avg_close > avg_open else "SELL" if avg_close < avg_open else "NEUTRAL"
+def get_sentiment_signal():
+    # Simulated sentiment signal for now
+    return "BUY" if datetime.utcnow().minute % 2 == 0 else "SELL"
 
-# 4. Final signal logic
 def generate_trade_signal(trend, sentiment):
-    return trend if trend == sentiment else "NEUTRAL"
+    if trend == sentiment:
+        return trend
+    return "NEUTRAL"
 
-# 5. SL/TP calculator (based on signal)
-def calculate_sl_tp(df, signal):
-    current_price = df["close"].iloc[-1]
+def calculate_sl_tp(price, signal, sl_multiplier=0.99, tp_multiplier=1.02):
     if signal == "BUY":
-        stop_loss = round(current_price * 0.985, 5)
-        take_profit = round(current_price * 1.015, 5)
+        return round(price * sl_multiplier, 5), round(price * tp_multiplier, 5)
     elif signal == "SELL":
-        stop_loss = round(current_price * 1.015, 5)
-        take_profit = round(current_price * 0.985, 5)
+        return round(price * tp_multiplier, 5), round(price * sl_multiplier, 5)
     else:
-        stop_loss, take_profit = None, None
-    return stop_loss, take_profit
+        return None, None
 
-# 6. Telegram alert sender
+
 def send_telegram_alert(signal, stop_loss, take_profit):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return
-
-    if signal == "NEUTRAL":
-        return
-
     message = (
-        f"📢 <b>EUR/USD Trade Signal:</b>\n"
-        f"Signal: <b>{signal}</b>\n"
+        "📢 EUR/USD Trade Signal:\n"
+        f"Signal: {signal}\n"
         f"Stop Loss: <b>{stop_loss}</b>\n"
         f"Take Profit: <b>{take_profit}</b>"
     )
-    bot = Bot(token=TELEGRAM_TOKEN)
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode="HTML")
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML"
+    }
+    requests.post(url, data=payload)
+
+def log_signal(timestamp, signal, sl, tp, result="pending"):
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    file_exists = os.path.isfile(LOG_PATH)
+
+    with open(LOG_PATH, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["timestamp", "signal", "stop_loss", "take_profit", "result"])
+        writer.writerow([timestamp, signal, sl, tp, result])
+

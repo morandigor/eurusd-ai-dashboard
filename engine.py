@@ -10,9 +10,24 @@ from dotenv import load_dotenv
 load_dotenv()
 TELEGRAM_TOKEN = st.secrets["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
+def fetch_eurusd_data():
+    url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1h&outputsize=100&apikey={os.getenv('TWELVE_DATA_API_KEY')}"
+    response = requests.get(url)
+    data = response.json()
+    
+    if "values" not in data:
+        raise ValueError("Invalid data returned from Twelve Data API")
+
+    df = pd.DataFrame(data["values"])
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df = df.sort_values("datetime")
+    df = df.astype({"open": "float", "high": "float", "low": "float", "close": "float"})
+    
+    return df
 
 # === Signal cache ===
 last_sent_signal = {"type": None, "time": None}
+
 
 
 # === Fetch price data ===

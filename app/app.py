@@ -1,12 +1,10 @@
-import streamlit as st  # First import
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # Must be second
+import streamlit as st
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
-# Other imports
+import os
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from dotenv import load_dotenv
-import os
 
 from engine import (
     fetch_eurusd_data,
@@ -16,7 +14,8 @@ from engine import (
     calculate_sl_tp_price,
     log_signal,
 )
-from app.alerts.telegram import send_telegram_alert
+from alerts.telegram import send_telegram_alert
+from dotenv import load_dotenv
 
 
 

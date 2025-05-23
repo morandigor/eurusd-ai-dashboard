@@ -1,48 +1,66 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-import engine
+import plotly.graph_objs as go
+from engine import (
+    fetch_eurusd_data,
+    get_trend_signal,
+    get_sentiment_signal,
+    generate_trade_signal,
+    calculate_sl_tp,
+    log_signal,
+)
 
+# Sidebar Config Panel
+st.sidebar.header("⚙️ Configuration")
+sl_multiplier = st.sidebar.slider("SL Multiplier", 0.97, 0.999, 0.99)
+tp_multiplier = st.sidebar.slider("TP Multiplier", 1.001, 1.05, 1.02)
+manual_override = st.sidebar.selectbox("Override Final Signal", ["None", "BUY", "SELL", "NEUTRAL"])
+
+# Page Setup
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 st.title("📊 EUR/USD Trading Intelligence Dashboard")
 
-try:
-    df = engine.fetch_eurusd_data()
+# Fetch Data
+data = fetch_eurusd_data()
+
+if data is not None:
     st.success("✅ Data fetched successfully")
-except Exception as e:
-    st.error(f"❌ Error fetching data: {e}")
-    st.stop()
 
-trend = engine.get_trend_signal(df)
-sentiment = engine.get_sentiment_signal()
-final_signal = engine.generate_trade_signal(trend, sentiment)
+    trend_signal = get_trend_signal(data)
+    sentiment_signal = get_sentiment_signal(data)
 
-st.subheader("🔍 Signal Breakdown")
-col1, col2, col3 = st.columns(3)
-col1.markdown("🧭 **Trend**")
-col1.markdown(f"**{trend}**")
-col2.markdown("🧠 **Sentiment**")
-col2.markdown(f"**{sentiment}**")
-col3.markdown("📟 **Final Signal**")
-col3.markdown(f"**{final_signal}**")
+    if manual_override != "None":
+        final_signal = manual_override
+    else:
+        final_signal = generate_trade_signal(trend_signal, sentiment_signal)
 
-st.subheader("📉 EUR/USD Price (Last 5 Days)")
-fig = pd.DataFrame({
-    "Price": df["close"].values
-}, index=df["datetime"])
-st.line_chart(fig)
+    # Display Signals
+    st.subheader("🔍 Signal Breakdown")
+    cols = st.columns(3)
+    cols[0].markdown("🧭 **Trend**")
+    cols[0].markdown(f"**{trend_signal}**")
+    cols[1].markdown("🧠 **Sentiment**")
+    cols[1].markdown(f"**{sentiment_signal}**")
+    cols[2].markdown("🟢 **Final Signal**")
+    cols[2].markdown(f"**{final_signal}**")
 
-st.subheader("🎯 SL/TP Levels")
-last_price = df["close"].iloc[-1]
-stop_loss, take_profit = engine.calculate_sl_tp(last_price, final_signal)
+    # Chart
+    st.subheader("📉 EUR/USD Price (Last 5 Days)")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=data.index, y=data["close"], mode="lines", name="EUR/USD"))
+    fig.update_layout(xaxis_title="Date", yaxis_title="Price", template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
 
-col4, col5 = st.columns(2)
-col4.metric("Stop Loss", stop_loss)
-col5.metric("Take Profit", take_profit)
+    # SL/TP
+    st.subheader("🎯 SL/TP Levels")
+    if final_signal in ["BUY", "SELL"]:
+        price = float(data["close"].iloc[-1])
+        stop_loss, take_profit = calculate_sl_tp(price, final_signal, sl_multiplier, tp_multiplier)
+        st.metric("Stop Loss", stop_loss)
+        st.metric("Take Profit", take_profit)
 
-timestamp = datetime.utcnow().isoformat()
-engine.log_signal(timestamp, final_signal, stop_loss, take_profit)
-
-# Optional alert
-if final_signal in ["BUY", "SELL"]:
-    engine.send_telegram_alert(final_signal, stop_loss, take_profit)
+        # Log
+        timestamp = pd.Timestamp.utcnow()
+        log_signal(timestamp, final_signal, stop_loss, take_profit)
+    else:
+        st.write("No SL/TP generated for NEUTRAL signal.")

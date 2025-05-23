@@ -31,7 +31,7 @@ try:
     take_profit = round(current_price * 1.01, 5)  # TP 1% above
 
     # === Telegram alert ===
-    engine.send_telegram_alert(final_signal, sl=stop_loss, tp=take_profit)
+    engine.send_telegram_alert(signal=final_signal, stop_loss=stop_loss, take_profit=take_profit)
 
     # === Display signals ===
     st.subheader("🔍 Signal Breakdown")

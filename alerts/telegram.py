@@ -1,21 +1,24 @@
+# app/alerts/send_telegram_alert.py
+
 import requests
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-def send_alert(message):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+def send_telegram_alert(message: str):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Telegram credentials not set.")
+        return
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message
-    }
+    
+def send_telegram_alert(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    requests.post(url, data=payload)
 
-    response = requests.post(url, data=payload)
-    if response.status_code == 200:
-        print("✅ Telegram alert sent.")
-    else:
-        print("❌ Failed to send alert:", response.text)
+    try:
+        response = requests.post(url, data=payload)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Telegram alert failed: {e}")

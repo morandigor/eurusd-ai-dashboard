@@ -1,7 +1,11 @@
 # engine.py
 
 import pandas as pd
+from dotenv import load_dotenv
 import os
+load_dotenv()
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 import csv
 
 LOG_PATH = "db/signals_log.csv"

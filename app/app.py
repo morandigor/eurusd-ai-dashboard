@@ -1,58 +1,74 @@
-# app.py
+import streamlit as st  # First import
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
-import streamlit as st  # ✅ Must be the first import
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # ✅ Must be first Streamlit command
-
-# Other imports
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-# Import engine functions
 from engine import (
     fetch_eurusd_data,
     get_trend_signal,
     get_sentiment_signal,
     generate_trade_signal,
     calculate_sl_tp_price,
-    log_signal
+    log_signal,
 )
+from alerts.send_telegram_alert import send_telegram_alert
 
-# Title
-st.title("📊 EUR/USD Trading Intelligence Dashboard")
+# Load environment variables
+load_dotenv()
 
-# Sidebar configuration
-st.sidebar.header("⚙️ Configuration")
+# App Title
+st.title("\U0001F4CA EUR/USD Trading Intelligence Dashboard")
+
+# Sidebar Config Panel
+st.sidebar.header("\u2699\ufe0f Configuration")
 sl_multiplier = st.sidebar.slider("SL Multiplier", 0.97, 0.999, 0.99)
 tp_multiplier = st.sidebar.slider("TP Multiplier", 1.001, 1.05, 1.02)
 manual_override = st.sidebar.selectbox("Override Final Signal", ["None", "BUY", "SELL", "NEUTRAL"])
 
-# Fetch and prepare data
+# Fetch Data
 df = fetch_eurusd_data()
-trend = get_trend_signal(df)
-sentiment = get_sentiment_signal()
-final_signal = generate_trade_signal(trend, sentiment, manual_override)
+price = df.iloc[-1]['close']
+trend_signal = get_trend_signal(df)
+sentiment_signal = get_sentiment_signal(df)
+final_signal = generate_trade_signal(trend_signal, sentiment_signal, manual_override)
 
 # Calculate SL/TP
-price = df['close'].iloc[-1]
 sl, tp = calculate_sl_tp_price(price, final_signal, sl_multiplier, tp_multiplier)
 
-# Log signal
+# Log the signal
 log_signal(datetime.now(), final_signal, sl, tp)
 
-# Display signals and chart
-st.subheader("🔍 Signal Breakdown")
+# Send Telegram Alert
+alert_msg = f"""
+\U0001F4C8 *New EUR/USD Signal*
+*Signal:* {final_signal}
+*Price:* {price}
+*SL:* {sl}
+*TP:* {tp}
+"""
+send_telegram_alert(alert_msg)
+
+# Display Output
+st.subheader("\U0001F50D Signal Breakdown")
 col1, col2, col3 = st.columns(3)
-col1.metric("📉 Trend", trend)
-col2.metric("🧠 Sentiment", sentiment)
-col3.metric("🟢 Final Signal", final_signal)
+col1.metric("\U0001F4CB Trend", trend_signal)
+col2.metric("\U0001F9E0 Sentiment", sentiment_signal)
+col3.metric("\U0001F7E2 Final Signal", final_signal)
 
-st.subheader("📉 EUR/USD Price (Last 5 Days)")
-fig = go.Figure(data=[go.Scatter(x=df['datetime'], y=df['close'], mode='lines+markers')])
-fig.update_layout(height=400, margin=dict(l=0, r=0, t=0, b=0))
-st.plotly_chart(fig, use_container_width=True)
+# Plot Price
+st.subheader("\U0001F4C8 EUR/USD Price (Last 5 Days)")
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df['datetime'], y=df['close'], mode='lines+markers'))
+fig.update_layout(xaxis_title="Date", yaxis_title="Price")
+st.plotly_chart(fig)
 
-st.subheader("🎯 SL/TP Levels")
-col1, col2 = st.columns(2)
-col1.metric("Stop Loss", round(sl, 5))
-col2.metric("Take Profit", round(tp, 5))
+# Display SL/TP
+st.subheader("\U0001F3AF SL/TP Levels")
+st.write("**Stop Loss**")
+st.write(sl)
+st.write("**Take Profit**")
+st.write(tp)

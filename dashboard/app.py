@@ -1,10 +1,11 @@
-import streamlit as st  # ✅ FIRST import
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # ✅ FIRST Streamlit command
+import streamlit as st  # ✅ First Streamlit import
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # ✅ MUST BE BEFORE ANY OTHER st. usage
 
-# Then import everything else
+# Other imports
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+
 from engine import (
     fetch_eurusd_data,
     get_trend_signal,
@@ -13,6 +14,7 @@ from engine import (
     calculate_sl_tp_price,
     log_signal
 )
+
 
 # App Title
 st.title("📊 EUR/USD Trading Intelligence Dashboard")

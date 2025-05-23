@@ -4,7 +4,8 @@ import pandas as pd
 import os
 import csv
 
-LOG_PATH = "signals_log.csv"
+LOG_PATH = "db/signals_log.csv"
+os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 
 def fetch_eurusd_data():
     # Replace with real-time or API call

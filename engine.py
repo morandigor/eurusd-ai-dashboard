@@ -1,20 +1,20 @@
 import os
 import requests
 import pandas as pd
-import plotly.graph_objects as go
-import streamlit as st
-from datetime import datetime
 from dotenv import load_dotenv
+from telegram import Bot
 
-# === Load environment variables ===
+# Load environment variables from .env
 load_dotenv()
-TELEGRAM_TOKEN = st.secrets["TELEGRAM_TOKEN"]
-TELEGRAM_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
 def fetch_eurusd_data():
     url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1h&outputsize=100&apikey={os.getenv('TWELVE_DATA_API_KEY')}"
     response = requests.get(url)
     data = response.json()
-    
+
     if "values" not in data:
         raise ValueError("Invalid data returned from Twelve Data API")
 
@@ -22,79 +22,51 @@ def fetch_eurusd_data():
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime")
     df = df.astype({"open": "float", "high": "float", "low": "float", "close": "float"})
-    
+
     return df
 
-# === Signal cache ===
-last_sent_signal = {"type": None, "time": None}
-
-
-
-# === Fetch price data ===
-def fetch_price_data():
-    url = "https://api.twelvedata.com/time_series"
-    params = {
-        "symbol": "EUR/USD",
-        "interval": "1h",
-        "outputsize": 120,
-        "apikey": st.secrets["TWELVE_DATA_API_KEY"]
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    return pd.DataFrame(data["values"])
-
-
-# === Generate signal ===
-def generate_trade_signal(trend, sentiment):
-    if trend == "BUY" and sentiment == "BUY":
+def get_trend_signal(df):
+    if df["close"].iloc[-1] > df["close"].iloc[0]:
         return "BUY"
-    elif trend == "SELL" and sentiment == "SELL":
+    elif df["close"].iloc[-1] < df["close"].iloc[0]:
         return "SELL"
     else:
         return "NEUTRAL"
 
-
-# === Calculate SL/TP (Simple version) ===
-def calculate_sl_tp(df, signal):
-    last_close = float(df.iloc[0]["close"])
-    if signal == "BUY":
-        sl = last_close * 0.995  # -0.5%
-        tp = last_close * 1.01   # +1%
-    elif signal == "SELL":
-        sl = last_close * 1.005  # +0.5%
-        tp = last_close * 0.99   # -1%
+def get_sentiment_signal(df):
+    if df["close"].mean() > df["open"].mean():
+        return "BUY"
+    elif df["close"].mean() < df["open"].mean():
+        return "SELL"
     else:
-        sl, tp = None, None
-    return round(sl, 5), round(tp, 5)
+        return "NEUTRAL"
 
+def generate_trade_signal(trend, sentiment):
+    if trend == sentiment:
+        return trend
+    else:
+        return "NEUTRAL"
 
-# === Send Telegram Alert if it's BUY or SELL only ===
-def send_telegram_alert(signal, sl, tp):
-    global last_sent_signal
+def calculate_sl_tp(df, signal):
+    current_price = df["close"].iloc[-1]
+    if signal == "BUY":
+        stop_loss = current_price * 0.985
+        take_profit = current_price * 1.015
+    elif signal == "SELL":
+        stop_loss = current_price * 1.015
+        take_profit = current_price * 0.985
+    else:
+        stop_loss = None
+        take_profit = None
+    return round(stop_loss, 5), round(take_profit, 5)
 
-    now = datetime.utcnow()
-    should_send = False
+def send_telegram_alert(signal, stop_loss, take_profit):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return
 
-    if signal in ["BUY", "SELL"]:
-        if last_sent_signal["type"] != signal:
-            should_send = True
-        elif last_sent_signal["time"] is None or (now - last_sent_signal["time"]).seconds >= 3600:
-            should_send = True
+    if signal not in ["BUY", "SELL"]:
+        return
 
-    if should_send:
-        message = (
-            f"📢 EUR/USD Trade Signal:\n"
-            f"Signal: *{signal}*\n"
-            f"Stop Loss: *{sl}*\n"
-            f"Take Profit: *{tp}*"
-        )
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "Markdown"
-        }
-        requests.post(url, data=payload)
-
-        last_sent_signal["type"] = signal
-        last_sent_signal["time"] = now
+    message = f"📢 EUR/USD Trade Signal:\nSignal: {signal}\nStop Loss: <b>{stop_loss}</b>\nTake Profit: <b>{take_profit}</b>"
+    bot = Bot(token=TELEGRAM_TOKEN)
+    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode="HTML")

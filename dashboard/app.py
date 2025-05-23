@@ -1,4 +1,6 @@
 import streamlit as st
+
+# 🛠 THIS MUST BE FIRST STREAMLIT COMMAND
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
 import pandas as pd
@@ -9,8 +11,13 @@ from engine import (
     get_trend_signal,
     get_sentiment_signal,
     generate_trade_signal,
+    calculate_sl_tp_price,
     log_signal
 )
+
+# App Title
+st.title("📊 EUR/USD Trading Intelligence Dashboard")
+
 
 
 

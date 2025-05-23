@@ -1,71 +1,88 @@
 import os
-import requests
+import csv
 import pandas as pd
+import requests
+from datetime import datetime
 from dotenv import load_dotenv
 from telegram import Bot
 
-# Load environment variables from .env
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-TWELVE_API_KEY = os.getenv("TWELVE_DATA_API_KEY")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+LOG_PATH = "dashboard/data/signals_log.csv"
 
-# 1. Fetch data from Twelve Data API
 def fetch_eurusd_data():
-    url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1h&outputsize=100&apikey={TWELVE_API_KEY}"
-    response = requests.get(url)
+    url = "https://api.twelvedata.com/time_series"
+    params = {
+        "symbol": "EUR/USD",
+        "interval": "1h",
+        "outputsize": 100,
+        "apikey": os.getenv("TWELVE_DATA_API_KEY")
+    }
+    response = requests.get(url, params=params)
     data = response.json()
-
-    if "values" not in data:
-        raise ValueError("Invalid data returned from Twelve Data API")
 
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime")
-    df = df.astype({"open": float, "high": float, "low": float, "close": float})
+    df["close"] = pd.to_numeric(df["close"])
+
     return df
 
-# 2. Trend signal (based on close vs open)
 def get_trend_signal(df):
-    return "BUY" if df["close"].iloc[-1] > df["open"].iloc[0] else "SELL" if df["close"].iloc[-1] < df["open"].iloc[0] else "NEUTRAL"
+    recent = df["close"].iloc[-5:]
+    if recent.is_monotonic_increasing:
+        return "BUY"
+    elif recent.is_monotonic_decreasing:
+        return "SELL"
+    return "NEUTRAL"
 
-# 3. Sentiment signal (based on average close vs average open)
 def get_sentiment_signal(df):
-    avg_close = df["close"].mean()
-    avg_open = df["open"].mean()
-    return "BUY" if avg_close > avg_open else "SELL" if avg_close < avg_open else "NEUTRAL"
+    change = df["close"].pct_change().iloc[-5:]
+    sentiment = "BUY" if change.mean() > 0 else "SELL"
+    return sentiment
 
-# 4. Final signal logic
-def generate_trade_signal(trend, sentiment):
-    return trend if trend == sentiment else "NEUTRAL"
-
-# 5. SL/TP calculator (based on signal)
-def calculate_sl_tp(df, signal):
-    current_price = df["close"].iloc[-1]
+def calculate_sl_tp(price, signal):
+    price = float(price)
     if signal == "BUY":
-        stop_loss = round(current_price * 0.985, 5)
-        take_profit = round(current_price * 1.015, 5)
+        return round(price * 0.99, 5), round(price * 1.02, 5)
     elif signal == "SELL":
-        stop_loss = round(current_price * 1.015, 5)
-        take_profit = round(current_price * 0.985, 5)
-    else:
-        stop_loss, take_profit = None, None
-    return stop_loss, take_profit
+        return round(price * 1.01, 5), round(price * 0.98, 5)
+    return None, None
 
-# 6. Telegram alert sender
+def log_signal(timestamp, signal, sl, tp, result="pending"):
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    file_exists = os.path.isfile(LOG_PATH)
+
+    with open(LOG_PATH, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["timestamp", "signal", "stop_loss", "take_profit", "result"])
+        writer.writerow([timestamp, signal, sl, tp, result])
+
 def send_telegram_alert(signal, stop_loss, take_profit):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return
+    if TELEGRAM_TOKEN and CHAT_ID:
+        bot = Bot(token=TELEGRAM_TOKEN)
+        msg = (
+            f"📢 EUR/USD Trade Signal:\n"
+            f"Signal: {signal}\n"
+            f"Stop Loss: {stop_loss}\n"
+            f"Take Profit: {take_profit}"
+        )
+        bot.send_message(chat_id=CHAT_ID, text=msg)
 
-    if signal == "NEUTRAL":
-        return
+def run_signal_engine():
+    df = fetch_eurusd_data()
+    trend = get_trend_signal(df)
+    sentiment = get_sentiment_signal(df)
 
-    message = (
-        f"📢 <b>EUR/USD Trade Signal:</b>\n"
-        f"Signal: <b>{signal}</b>\n"
-        f"Stop Loss: <b>{stop_loss}</b>\n"
-        f"Take Profit: <b>{take_profit}</b>"
-    )
-    bot = Bot(token=TELEGRAM_TOKEN)
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode="HTML")
+    final_signal = trend if trend == sentiment else "NEUTRAL"
+    latest_price = df["close"].iloc[-1]
+    sl, tp = calculate_sl_tp(latest_price, final_signal)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_signal(timestamp, final_signal, sl, tp)
+    send_telegram_alert(final_signal, sl, tp)
+
+    return final_signal, trend, sentiment, sl, tp

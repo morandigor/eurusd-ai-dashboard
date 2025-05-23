@@ -16,7 +16,8 @@ from engine import (
     calculate_sl_tp_price,
     log_signal,
 )
-from alerts.telegram import send_telegram_alert
+from app.alerts.telegram import send_telegram_alert
+
 
 
 # Load environment variables

@@ -1,18 +1,17 @@
 import streamlit as st
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
+
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from engine import (
+from dashboard.engine import (
     fetch_eurusd_data,
     get_trend_signal,
     get_sentiment_signal,
     generate_trade_signal,
-    calculate_sl_tp,
     log_signal
 )
 
-# 🔥 THIS MUST BE THE FIRST STREAMLIT COMMAND
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
 # Sidebar Config Panel
 st.sidebar.header("⚙️ Configuration")

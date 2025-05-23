@@ -34,13 +34,15 @@ def generate_trade_signal(trend, sentiment):
         return trend
     return "NEUTRAL"
 
-def calculate_sl_tp(price, signal, sl_multiplier=0.99, tp_multiplier=1.02):
+def calculate_sl_tp_price(price, signal):
+    price = float(price)
     if signal == "BUY":
-        return round(price * sl_multiplier, 5), round(price * tp_multiplier, 5)
+        return round(price * 0.99, 5), round(price * 1.02, 5)
     elif signal == "SELL":
-        return round(price * tp_multiplier, 5), round(price * sl_multiplier, 5)
-    else:
-        return None, None
+        return round(price * 1.01, 5), round(price * 0.98, 5)
+    return None, None
+
+
 
 
 def send_telegram_alert(signal, stop_loss, take_profit):

@@ -10,11 +10,15 @@ from engine import (
     log_signal,
 )
 
+# ✅ This must be the first Streamlit command
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
+
 # Sidebar Config Panel
 st.sidebar.header("⚙️ Configuration")
 sl_multiplier = st.sidebar.slider("SL Multiplier", 0.97, 0.999, 0.99)
 tp_multiplier = st.sidebar.slider("TP Multiplier", 1.001, 1.05, 1.02)
 manual_override = st.sidebar.selectbox("Override Final Signal", ["None", "BUY", "SELL", "NEUTRAL"])
+
 
 # Page Setup
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")

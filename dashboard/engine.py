@@ -1,3 +1,4 @@
+import csv
 import os
 import pandas as pd
 import requests
@@ -59,8 +60,10 @@ def send_telegram_alert(signal, stop_loss, take_profit):
 def log_signal(timestamp, signal, sl, tp, result="pending"):
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     file_exists = os.path.isfile(LOG_PATH)
+
     with open(LOG_PATH, mode="a", newline="") as file:
-        writer = pd.io.common.csv_writer(file)
+        writer = csv.writer(file)
         if not file_exists:
             writer.writerow(["timestamp", "signal", "stop_loss", "take_profit", "result"])
         writer.writerow([timestamp, signal, sl, tp, result])
+

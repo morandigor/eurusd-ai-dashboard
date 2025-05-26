@@ -35,7 +35,7 @@ trade_signal = generate_trade_signal(data, trend_signal, sentiment_signal)
 current_price = data["close"].iloc[-1]
 
 # 🛡️ SL e TP
-sl, tp = calculate_sl_tp(current_price, trade_signal)
+sl, tp = calculate_sl_tp(data, trade_signal)
 
 # 📤 Envia alerta se for BUY ou SELL
 if trade_signal in ["BUY", "SELL"]:

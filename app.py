@@ -50,7 +50,7 @@ if trade_signal in ["BUY", "SELL"]:
 💰 Entry Price: {current_price:.5f}
 🕒 Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
 """
-    send_telegram_alert(msg)
+    send_telegram_alert(msg, sl, tp)
 
 # 🧾 Loga no Supabase
 log_to_supabase(

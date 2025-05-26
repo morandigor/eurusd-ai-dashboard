@@ -4,10 +4,8 @@ import os
 from datetime import datetime
 
 def fetch_eurusd_data():
-    # 🔐 Pega a API Key do .env
     api_key = os.getenv("TWELVE_DATA_API_KEY")
 
-    # 🔗 Endpoint da Twelve Data para EUR/USD (intervalo de 1h)
     url = (
         f"https://api.twelvedata.com/time_series?"
         f"symbol=EUR/USD&interval=1h&outputsize=100&apikey={api_key}"
@@ -17,7 +15,7 @@ def fetch_eurusd_data():
     data = response.json()
 
     if "values" not in data:
-        raise Exception(f"Erro ao buscar dados da Twelve Data: {data}")
+        raise Exception(f"Erro na API Twelve Data: {data}")
 
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
@@ -29,8 +27,7 @@ def fetch_eurusd_data():
         "close": "close"
     })
     df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].astype(float)
-
-    df = df.sort_values("time")  # Garante ordem cronológica crescente
+    df = df.sort_values("time")
     return df
 
 def get_trend_signal(df):

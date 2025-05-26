@@ -60,7 +60,12 @@ log_to_supabase(
     trend=trend_signal,
     sentiment=sentiment_signal,
     price=current_price,
+    hit="pending",
+    return_pct=0.0,
+    capital=1000.0,
+    sent="yes" if trade_signal in ["BUY", "SELL"] else "no"
 )
+
 
 # 🖼️ Título e Sinal
 st.title("📉 EUR/USD AI Trading Dashboard")

@@ -100,7 +100,7 @@ st.markdown("---")
 st.header("📈 Histórico de Sinais")
 
 if os.path.exists("signals_log.csv"):
-    df_log = pd.read_csv("signals_log.csv")
+    df_log = pd.read_csv("db/signals_log.csv")
     df_log["Timestamp"] = pd.to_datetime(df_log["Timestamp"])
 
     filtro = st.selectbox("📌 Filtrar por tipo de sinal:", options=["Todos", "BUY", "SELL", "WAIT"])

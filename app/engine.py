@@ -57,7 +57,7 @@ def log_signal(signal, sl, tp):
         f.write(f"{datetime.now()} | {signal} | SL: {sl} | TP: {tp}\n")
 
 def log_to_csv(signal, sl, tp, trend, sentiment, entry_price, was_sent, future_high, future_low, initial_capital=10000, risk_percent=1.0):
-    file = "signals_log.csv"
+    file = "db/signals_log.csv"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Simula resultado

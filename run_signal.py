@@ -15,8 +15,7 @@ df = fetch_eurusd_data()
 # 🧠 Calcula sinais
 trend = get_trend_signal(df)
 sentiment = get_sentiment_signal(df)
-signal = generate_trade_signal(trend, sentiment)
-
+signal = generate_trade_signal(trend, sentiment, df)
 # 💰 Preço atual
 current_price = df["close"].iloc[-1]
 

@@ -1,14 +1,22 @@
-# app/telegram.py
-
-import os
 import requests
+import os
 
-def send_telegram_alert(message):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
+def send_telegram_alert(signal, sl, tp):
+    token = os.getenv("TELEGRAM_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    if not token or not chat_id:
-        print("Telegram config missing in .env")
-        return
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = {"chat_id": chat_id, "text": message}
-    requests.post(url, data=data)
+
+    message = (
+        f"📢 *EUR/USD Trade Signal*\n"
+        f"Signal: *{signal}*\n"
+        f"Stop Loss: `{sl}`\n"
+        f"Take Profit: `{tp}`"
+    )
+
+    url = (
+        f"https://api.telegram.org/bot{token}/sendMessage?"
+        f"chat_id={chat_id}&text={message}&parse_mode=Markdown"
+    )
+
+    response = requests.get(url)
+    if not response.ok:
+        raise Exception(f"Telegram error: {response.text}")

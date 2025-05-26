@@ -1,38 +1,37 @@
 import pandas as pd
-from datetime import datetime
-import os
-
-LOG_PATH = "db/signals_log.csv"
+import requests
 
 def fetch_eurusd_data():
-    # Simulated data - replace with your real source/API call
-    now = pd.Timestamp.now()
-    data = {
-        "timestamp": pd.date_range(end=now, periods=60, freq="H"),
-        "price": [1.12 + 0.0001 * i for i in range(60)]
-    }
-    return pd.DataFrame(data)
+    # 🔁 Substituir com sua fonte real (API, CSV, etc.)
+    url = "https://api.example.com/eurusd"  # Exemplo
+    df = pd.read_csv("sample_data.csv")     # Mock
+    df['time'] = pd.to_datetime(df['time'])
+    return df
 
 def get_trend_signal(df):
-    return "BUY" if df['price'].iloc[-1] > df['price'].iloc[-10] else "SELL"
+    # Exemplo simples: média móvel
+    df['ma'] = df['close'].rolling(10).mean()
+    if df['close'].iloc[-1] > df['ma'].iloc[-1]:
+        return "uptrend"
+    else:
+        return "downtrend"
 
-def get_sentiment_signal(df):
-    return "BUY" if df['price'].diff().mean() > 0 else "SELL"
+def get_sentiment_signal():
+    # Simula análise de sentimento
+    return "bullish"
 
 def generate_trade_signal(trend, sentiment):
-    return "BUY" if trend == "BUY" and sentiment == "BUY" else "SELL"
+    if trend == "uptrend" and sentiment == "bullish":
+        return "BUY"
+    elif trend == "downtrend" and sentiment == "bearish":
+        return "SELL"
+    else:
+        return "WAIT"
 
-def calculate_sl_tp_price(price, signal, sl_multiplier, tp_multiplier):
-    if signal == "BUY":
-        return price * sl_multiplier, price * tp_multiplier
-    elif signal == "SELL":
-        return price / tp_multiplier, price / sl_multiplier
-    return None, None
+def calculate_sl_tp_price(df):
+    close = df['close'].iloc[-1]
+    return round(close * 0.995, 5), round(close * 1.005, 5)  # SL, TP
 
-def log_signal(timestamp, signal, sl, tp):
-    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-    file_exists = os.path.isfile(LOG_PATH)
-    with open(LOG_PATH, mode="a") as f:
-        if not file_exists:
-            f.write("timestamp,signal,sl,tp\n")
-        f.write(f"{timestamp},{signal},{sl},{tp}\n")
+def log_signal(signal, sl, tp):
+    with open("logs.txt", "a") as f:
+        f.write(f"{signal} | SL: {sl} | TP: {tp}\n")

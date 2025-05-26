@@ -1,19 +1,18 @@
+# alerts/telegram.py
 import os
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
 
 def send_telegram_alert(message):
-    token = os.getenv("TELEGRAM_TOKEN")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message
-    }
+
+    if not bot_token or not chat_id:
+        print("Missing Telegram credentials.")
+        return
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message}
     try:
-        response = requests.post(url, data=payload)
-        response.raise_for_status()
+        requests.post(url, json=payload)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"Failed to send alert: {e}")

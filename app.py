@@ -13,9 +13,9 @@ from app.engine import (
     fetch_eurusd_data,
     get_trend_signal,
     get_sentiment_signal,
+    calculate_sl_tp,
     generate_trade_signal,
-    calculate_sl_tp_price,
-    log_to_supabase,
+    log_to_supabase
 )
 
 from app.telegram import send_telegram_alert
@@ -35,7 +35,7 @@ trade_signal = generate_trade_signal(trend_signal, sentiment_signal)
 current_price = data["close"].iloc[-1]
 
 # 🛡️ SL e TP
-sl, tp = calculate_sl_tp_price(current_price, trade_signal)
+sl, tp = calculate_sl_tp(current_price, trade_signal)
 
 # 📤 Envia alerta se for BUY ou SELL
 if trade_signal in ["BUY", "SELL"]:

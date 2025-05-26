@@ -9,7 +9,9 @@ from app.engine import (
 )
 from app.telegram import send_telegram_alert
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timezone
+timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
 
 load_dotenv()
 

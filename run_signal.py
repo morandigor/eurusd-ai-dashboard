@@ -1,3 +1,4 @@
+import pandas as pd
 from app.engine import (
     fetch_eurusd_data,
     get_trend_signal,
@@ -7,35 +8,41 @@ from app.engine import (
     log_to_supabase
 )
 from app.telegram import send_telegram_alert
-from datetime import datetime, timezone
+from dotenv import load_dotenv
+from datetime import datetime
 
-# 📥 Coleta dados
+load_dotenv()
+
+# 🚀 Coleta dados
 df = fetch_eurusd_data()
 
-# 🧠 Calcula sinais
+# 🧠 Sinais
 trend = get_trend_signal(df)
 sentiment = get_sentiment_signal(df)
-signal = generate_trade_signal(trend, sentiment, df)
+signal = generate_trade_signal(trend, sentiment)
+
 # 💰 Preço atual
 current_price = df["close"].iloc[-1]
 
 # 🛡️ SL e TP
 sl, tp = calculate_sl_tp(df, signal)
 
-# 🕒 Timestamp atual em UTC
-timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+# 🕒 Timestamp
+timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
-# 📤 Envia alerta no Telegram (apenas se for BUY ou SELL)
-if signal in ["BUY", "SELL"]:
-    msg = f"""
-📈 Novo sinal gerado: {signal}
-💰 Entrada: {current_price:.5f}
-🛑 SL: {sl:.5f} | 🎯 TP: {tp:.5f}
-🕒 {timestamp} UTC
+# 📤 Mensagem Telegram
+msg = f"""📉 EUR/USD AI SIGNAL
+Sinal: {signal}
+Timestamp: {timestamp}
 """
-    send_telegram_alert(msg, sl, tp)
 
-# 🧾 Loga no Supabase
+if signal in ["BUY", "SELL"]:
+    msg += f"SL: {sl:.5f}\nTP: {tp:.5f}"
+    send_telegram_alert(msg, sl, tp)
+else:
+    send_telegram_alert(msg, sl=0, tp=0)
+
+# 🧾 Loga no Supabase (simulando valores neutros para retorno/capital)
 log_to_supabase(
     signal=signal,
     sl=sl,
@@ -43,8 +50,8 @@ log_to_supabase(
     trend=trend,
     sentiment=sentiment,
     price=current_price,
-    hit="-",
-    return_pct=0.0,
-    capital=0.0,
-    sent="auto"
+    hit="",
+    return_pct=0,
+    capital=0,
+    sent="yes"
 )

@@ -86,7 +86,7 @@ elapsed = time.time() - st.session_state["last_refresh"]
 
 if elapsed > 900:
     st.session_state["last_refresh"] = time.time()
-    st.experimental_rerun()
+    st.rerun()
 else:
     remaining = 900 - int(elapsed)
     mins, secs = divmod(remaining, 60)

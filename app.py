@@ -6,11 +6,8 @@ st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from dotenv import load_dotenv
+import time
 import os
-
-# ⚙️ Load .env
-load_dotenv()
 
 # 📦 Imports do projeto
 from app.engine import (
@@ -24,7 +21,7 @@ from app.engine import (
 from app.telegram import send_telegram_alert
 
 # ============================
-# 🧠 DASHBOARD LÓGICA
+# 📊 LAYOUT
 # ============================
 
 st.title("📈 EUR/USD AI Trading Dashboard")
@@ -38,7 +35,7 @@ sl, tp = calculate_sl_tp_price(data)
 log_signal(trade_signal, sl, tp)
 
 # 🧾 Exibição
-st.subheader("📊 Signal Generated")
+st.subheader("📊 Sinal Gerado")
 st.markdown(f"**Trade Signal:** `{trade_signal}`")
 st.markdown(f"**Stop Loss:** `{sl}` | **Take Profit:** `{tp}`")
 st.markdown(f"**Trend Signal:** `{trend_signal}`")
@@ -56,10 +53,29 @@ fig.add_trace(go.Candlestick(
 ))
 st.plotly_chart(fig, use_container_width=True)
 
-# 🚀 Alerta Telegram
+# ============================
+# 📩 ALERTA AUTOMÁTICO TELEGRAM
+# ============================
+
 if trade_signal in ["BUY", "SELL"]:
     send_telegram_alert(trade_signal, sl, tp)
-    st.success("📬 Alerta enviado automaticamente!")
+    st.success(f"📬 Alerta enviado automaticamente para: {trade_signal}")
 else:
     st.info("⚪ Nenhum alerta enviado. Sinal atual: WAIT.")
 
+# ============================
+# 🔄 AUTO-REFRESH A CADA 15 MIN
+# ============================
+
+if "last_refresh" not in st.session_state:
+    st.session_state["last_refresh"] = time.time()
+
+elapsed = time.time() - st.session_state["last_refresh"]
+
+if elapsed > 900:  # 900 segundos = 15 minutos
+    st.session_state["last_refresh"] = time.time()
+    st.experimental_rerun()
+else:
+    remaining = 900 - int(elapsed)
+    mins, secs = divmod(remaining, 60)
+    st.sidebar.info(f"⏳ Atualização automática em {mins:02d}:{secs:02d}")

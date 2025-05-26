@@ -81,3 +81,42 @@ else:
     remaining = 900 - int(elapsed)
     mins, secs = divmod(remaining, 60)
     st.sidebar.info(f"⏳ Atualização automática em {mins:02d}:{secs:02d}")
+# ============================
+# 📊 PAINEL DE PERFORMANCE
+# ============================
+
+st.markdown("---")
+st.header("📈 Histórico de Sinais")
+
+import os
+
+if os.path.exists("signals_log.csv"):
+    df_log = pd.read_csv("signals_log.csv")
+    df_log["Timestamp"] = pd.to_datetime(df_log["Timestamp"])
+
+    # 📌 Filtro por tipo de sinal
+    filtro = st.selectbox("📌 Filtrar por tipo de sinal:", options=["Todos", "BUY", "SELL", "WAIT"])
+    if filtro != "Todos":
+        df_log = df_log[df_log["Signal"] == filtro]
+
+    # 📉 Mostrar últimos 20 sinais
+    st.subheader("🧾 Últimos 20 sinais")
+    st.dataframe(df_log.sort_values("Timestamp", ascending=False).head(20), use_container_width=True)
+
+    # 📊 Estatísticas rápidas
+    st.subheader("📊 Estatísticas")
+    total = len(df_log)
+    enviados = len(df_log[df_log["Sent"] == "Yes"])
+    por_envio = round(enviados / total * 100, 2) if total else 0
+
+    buy_count = len(df_log[df_log["Signal"] == "BUY"])
+    sell_count = len(df_log[df_log["Signal"] == "SELL"])
+    wait_count = len(df_log[df_log["Signal"] == "WAIT"])
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total de Sinais", total)
+    col2.metric("Alertas Enviados", enviados)
+    col3.metric("Taxa de Envio (%)", por_envio)
+    col4.metric("Sinais BUY / SELL / WAIT", f"{buy_count} / {sell_count} / {wait_count}")
+else:
+    st.warning("Nenhum log de sinal encontrado ainda.")

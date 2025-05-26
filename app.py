@@ -1,15 +1,12 @@
 import streamlit as st
 
-# Deve ser o primeiro comando do Streamlit
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 import time
-import os
 
-# 📦 Imports do projeto
 from app.engine import (
     fetch_eurusd_data,
     get_trend_signal,
@@ -17,22 +14,27 @@ from app.engine import (
     generate_trade_signal,
     calculate_sl_tp_price,
     log_signal,
+    log_to_csv,
 )
 from app.telegram import send_telegram_alert
 
 # ============================
-# 📊 LAYOUT
+# 📊 DASHBOARD
 # ============================
 
 st.title("📈 EUR/USD AI Trading Dashboard")
 
-# 🔍 Dados
+# 🔍 Dados e sinais
 data = fetch_eurusd_data()
 trend_signal = get_trend_signal(data)
 sentiment_signal = get_sentiment_signal()
 trade_signal = generate_trade_signal(trend_signal, sentiment_signal)
 sl, tp = calculate_sl_tp_price(data)
 log_signal(trade_signal, sl, tp)
+
+current_price = data["close"].iloc[-1]
+was_sent = trade_signal in ["BUY", "SELL"]
+log_to_csv(trade_signal, sl, tp, trend_signal, sentiment_signal, current_price, was_sent)
 
 # 🧾 Exibição
 st.subheader("📊 Sinal Gerado")
@@ -57,7 +59,7 @@ st.plotly_chart(fig, use_container_width=True)
 # 📩 ALERTA AUTOMÁTICO TELEGRAM
 # ============================
 
-if trade_signal in ["BUY", "SELL"]:
+if was_sent:
     send_telegram_alert(trade_signal, sl, tp)
     st.success(f"📬 Alerta enviado automaticamente para: {trade_signal}")
 else:
@@ -72,7 +74,7 @@ if "last_refresh" not in st.session_state:
 
 elapsed = time.time() - st.session_state["last_refresh"]
 
-if elapsed > 900:  # 900 segundos = 15 minutos
+if elapsed > 900:
     st.session_state["last_refresh"] = time.time()
     st.experimental_rerun()
 else:

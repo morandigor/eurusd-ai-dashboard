@@ -38,7 +38,7 @@ sl, tp = calculate_sl_tp_price(data)
 log_signal(trade_signal, sl, tp)
 
 # 🧾 Exibição
-st.subheader("📊 Sinal Gerado")
+st.subheader("📊 Signal Generated")
 st.markdown(f"**Trade Signal:** `{trade_signal}`")
 st.markdown(f"**Stop Loss:** `{sl}` | **Take Profit:** `{tp}`")
 st.markdown(f"**Trend Signal:** `{trend_signal}`")
@@ -57,6 +57,9 @@ fig.add_trace(go.Candlestick(
 st.plotly_chart(fig, use_container_width=True)
 
 # 🚀 Alerta Telegram
-if st.button("📩 Enviar Alerta no Telegram"):
+if trade_signal in ["BUY", "SELL"]:
     send_telegram_alert(trade_signal, sl, tp)
-    st.success("Alerta enviado com sucesso!")
+    st.success("📬 Alerta enviado automaticamente!")
+else:
+    st.info("⚪ Nenhum alerta enviado. Sinal atual: WAIT.")
+

@@ -1,15 +1,16 @@
 import requests
-import os
+import streamlit as st
 
 def send_telegram_alert(signal, sl, tp):
-    token = os.getenv("TELEGRAM_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    token = st.secrets["TELEGRAM_BOT_TOKEN"]
+    chat_id = st.secrets["TELEGRAM_CHAT_ID"]
 
+    emoji = "🟢" if signal == "BUY" else "🔴" if signal == "SELL" else "⚪️"
     message = (
-        f"📢 *EUR/USD Trade Signal*\n"
-        f"Signal: *{signal}*\n"
-        f"Stop Loss: `{sl}`\n"
-        f"Take Profit: `{tp}`"
+        f"{emoji} *EUR/USD Trade Signal*\n\n"
+        f"*Signal:* `{signal}`\n"
+        f"*Stop Loss:* `{sl}`\n"
+        f"*Take Profit:* `{tp}`"
     )
 
     url = (
@@ -19,4 +20,4 @@ def send_telegram_alert(signal, sl, tp):
 
     response = requests.get(url)
     if not response.ok:
-        raise Exception(f"Telegram error: {response.text}")
+        st.error(f"❌ Erro ao enviar alerta: {response.text}")

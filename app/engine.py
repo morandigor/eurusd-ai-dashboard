@@ -122,3 +122,10 @@ def log_to_supabase(
     }
 
     supabase.table("signals_log").insert(data).execute()
+
+def get_logs_from_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(url, key)
+    data = supabase.table("signals_log").select("*").order("timestamp", desc=True).execute()
+    return pd.DataFrame(data.data)

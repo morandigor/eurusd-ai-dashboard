@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # ✅ This line must be first
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
 # 📦 Standard libraries
 import pandas as pd

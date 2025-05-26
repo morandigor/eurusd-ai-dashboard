@@ -5,9 +5,12 @@ import streamlit as st
 from datetime import datetime
 import csv
 
+# ==============================
+# 📥 BUSCAR DADOS DA API
+# ==============================
+
 def fetch_eurusd_data():
     api_key = st.secrets["TWELVE_DATA_API_KEY"]
-
     url = (
         f"https://api.twelvedata.com/time_series?"
         f"symbol=EUR/USD&interval=1h&outputsize=100&apikey={api_key}"
@@ -34,12 +37,16 @@ def fetch_eurusd_data():
     df = df.sort_values("time")
     return df
 
+# ==============================
+# 📈 LÓGICA DE SINAL
+# ==============================
+
 def get_trend_signal(df):
     df['ma'] = df['close'].rolling(10).mean()
     return "uptrend" if df['close'].iloc[-1] > df['ma'].iloc[-1] else "downtrend"
 
 def get_sentiment_signal():
-    return "bullish"  # Placeholder fixo
+    return "bullish"  # placeholder
 
 def generate_trade_signal(trend, sentiment):
     if trend == "uptrend" and sentiment == "bullish":
@@ -52,15 +59,27 @@ def calculate_sl_tp_price(df):
     close = df['close'].iloc[-1]
     return round(close * 0.995, 5), round(close * 1.005, 5)
 
+# ==============================
+# 📝 LOG BÁSICO
+# ==============================
+
 def log_signal(signal, sl, tp):
     with open("logs.txt", "a") as f:
         f.write(f"{datetime.now()} | {signal} | SL: {sl} | TP: {tp}\n")
 
-def log_to_csv(signal, sl, tp, trend, sentiment, entry_price, was_sent, future_high, future_low, initial_capital=10000, risk_percent=1.0):
+# ==============================
+# 📊 LOG COMPLETO EM CSV
+# ==============================
+
+def log_to_csv(
+    signal, sl, tp, trend, sentiment,
+    entry_price, was_sent, future_high, future_low,
+    initial_capital=10000, risk_percent=1.0
+):
     file = "db/signals_log.csv"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Simula resultado
+    # 🎯 Determina se atingiu SL ou TP
     hit = "None"
     if signal == "BUY":
         if future_high >= tp:
@@ -73,7 +92,7 @@ def log_to_csv(signal, sl, tp, trend, sentiment, entry_price, was_sent, future_h
         elif future_high >= sl:
             hit = "SL"
 
-    # Calcula retorno
+    # 📈 Cálculo de retorno
     rr_ratio = abs(tp - entry_price) / abs(sl - entry_price) if abs(sl - entry_price) != 0 else 1
     retorno_pct = 0
     if hit == "TP":
@@ -81,14 +100,19 @@ def log_to_csv(signal, sl, tp, trend, sentiment, entry_price, was_sent, future_h
     elif hit == "SL":
         retorno_pct = -risk_percent
 
-    # Capital acumulado
+    # 💰 Simulação de capital acumulado
     capital = initial_capital
     if os.path.exists(file):
-        df = pd.read_csv(file)
-        if not df.empty and "Capital" in df.columns:
-            capital = df["Capital"].iloc[-1]
+        try:
+            df = pd.read_csv(file)
+            if not df.empty and "Capital" in df.columns:
+                capital = df["Capital"].iloc[-1]
+        except (pd.errors.EmptyDataError, pd.errors.ParserError):
+            df = pd.DataFrame()
+
     capital += capital * (retorno_pct / 100)
 
+    # 🧾 Monta linha do log
     row = {
         "Timestamp": timestamp,
         "Signal": signal,

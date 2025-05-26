@@ -1,50 +1,38 @@
-# engine.py
-
 import pandas as pd
-from dotenv import load_dotenv
+from datetime import datetime
 import os
-load_dotenv()
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-import csv
 
 LOG_PATH = "db/signals_log.csv"
-os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 
 def fetch_eurusd_data():
-    # Replace with real-time or API call
-    dates = pd.date_range(end=pd.Timestamp.now(), periods=100, freq="H")
-    prices = pd.Series(1.12 + (pd.Series(range(100)) * 0.0001))
-    return pd.DataFrame({"datetime": dates, "close": prices})
+    # Simulated data - replace with your real source/API call
+    now = pd.Timestamp.now()
+    data = {
+        "timestamp": pd.date_range(end=now, periods=60, freq="H"),
+        "price": [1.12 + 0.0001 * i for i in range(60)]
+    }
+    return pd.DataFrame(data)
 
 def get_trend_signal(df):
-    change = df['close'].pct_change().iloc[-5:]
-    return "BUY" if change.mean() > 0 else "SELL"
+    return "BUY" if df['price'].iloc[-1] > df['price'].iloc[-10] else "SELL"
 
-def get_sentiment_signal():
-    # Stub - replace with real sentiment analysis
-    return "BUY"
+def get_sentiment_signal(df):
+    return "BUY" if df['price'].diff().mean() > 0 else "SELL"
 
-def generate_trade_signal(trend, sentiment, override="None"):
-    if override != "None":
-        return override
-    if trend == sentiment:
-        return trend
-    return "NEUTRAL"
+def generate_trade_signal(trend, sentiment):
+    return "BUY" if trend == "BUY" and sentiment == "BUY" else "SELL"
 
 def calculate_sl_tp_price(price, signal, sl_multiplier, tp_multiplier):
     if signal == "BUY":
-        return round(price * sl_multiplier, 5), round(price * tp_multiplier, 5)
+        return price * sl_multiplier, price * tp_multiplier
     elif signal == "SELL":
-        return round(price * tp_multiplier, 5), round(price * sl_multiplier, 5)
+        return price / tp_multiplier, price / sl_multiplier
     return None, None
 
 def log_signal(timestamp, signal, sl, tp):
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     file_exists = os.path.isfile(LOG_PATH)
-    
-    with open(LOG_PATH, mode="a", newline="") as file:
-        writer = csv.writer(file)
+    with open(LOG_PATH, mode="a") as f:
         if not file_exists:
-            writer.writerow(["timestamp", "signal", "stop_loss", "take_profit"])
-        writer.writerow([timestamp, signal, sl, tp])
+            f.write("timestamp,signal,sl,tp\n")
+        f.write(f"{timestamp},{signal},{sl},{tp}\n")

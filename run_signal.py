@@ -7,46 +7,45 @@ from app.engine import (
     log_to_supabase
 )
 from app.telegram import send_telegram_alert
-from dotenv import load_dotenv
-import os
+from datetime import datetime, timezone
 
-# ============================
-# ✅ Load .env (se local)
-# ============================
-load_dotenv()
+# 📥 Coleta dados
+df = fetch_eurusd_data()
 
-# ============================
-# 🚀 EXECUTA SINAL E ALERTA
-# ============================
-def run():
-    try:
-        data = fetch_eurusd_data()
-        trend = get_trend_signal(data)
-        sentiment= get_sentiment_signal(df)
-        signal = generate_trade_signal(trend, sentiment)
-        sl, tp = calculate_sl_tp(data)
+# 🧠 Calcula sinais
+trend = get_trend_signal(df)
+sentiment = get_sentiment_signal(df)
+signal = generate_trade_signal(trend, sentiment)
 
-        entry_price = data["close"].iloc[-1]
-        future_high = data["high"].iloc[-1]
-        future_low = data["low"].iloc[-1]
+# 💰 Preço atual
+current_price = df["close"].iloc[-1]
 
-        was_sent = signal in ["BUY", "SELL"]
+# 🛡️ SL e TP
+sl, tp = calculate_sl_tp(df, signal)
 
-        # ✅ Salva no Supabase
-        log_to_supabase(
-            signal, sl, tp, trend, sentiment,
-            entry_price, was_sent, future_high, future_low
-        )
+# 🕒 Timestamp atual em UTC
+timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
-        # 📬 Alerta Telegram
-        if was_sent:
-            send_telegram_alert(signal, sl, tp)
+# 📤 Envia alerta no Telegram (apenas se for BUY ou SELL)
+if signal in ["BUY", "SELL"]:
+    msg = f"""
+📈 Novo sinal gerado: {signal}
+💰 Entrada: {current_price:.5f}
+🛑 SL: {sl:.5f} | 🎯 TP: {tp:.5f}
+🕒 {timestamp} UTC
+"""
+    send_telegram_alert(msg, sl, tp)
 
-        print(f"✅ [{signal}] executado com sucesso.")
-
-    except Exception as e:
-        print("❌ Erro ao executar run_signal:", str(e))
-
-
-if __name__ == "__main__":
-    run()
+# 🧾 Loga no Supabase
+log_to_supabase(
+    signal=signal,
+    sl=sl,
+    tp=tp,
+    trend=trend,
+    sentiment=sentiment,
+    price=current_price,
+    hit="-",
+    return_pct=0.0,
+    capital=0.0,
+    sent="auto"
+)

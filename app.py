@@ -29,7 +29,7 @@ data = fetch_eurusd_data()
 # 🧠 Sinais
 trend_signal = get_trend_signal(data)
 sentiment_signal = get_sentiment_signal(data)
-trade_signal = generate_trade_signal(trend_signal, sentiment_signal)
+trade_signal = generate_trade_signal(data, trend_signal, sentiment_signal)
 
 # 🎯 Preço atual
 current_price = data["close"].iloc[-1]

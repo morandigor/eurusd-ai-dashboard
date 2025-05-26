@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Configuração da página
+# Página
 st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")
 
 import pandas as pd
@@ -9,6 +9,7 @@ from datetime import datetime
 import time
 import os
 
+# App logic
 from app.engine import (
     fetch_eurusd_data,
     get_trend_signal,
@@ -26,7 +27,7 @@ from app.telegram import send_telegram_alert
 
 st.title("📈 EUR/USD AI Trading Dashboard")
 
-# Obter dados e gerar sinal
+# Obter dados
 data = fetch_eurusd_data()
 trend_signal = get_trend_signal(data)
 sentiment_signal = get_sentiment_signal()
@@ -34,26 +35,26 @@ trade_signal = generate_trade_signal(trend_signal, sentiment_signal)
 sl, tp = calculate_sl_tp_price(data)
 log_signal(trade_signal, sl, tp)
 
-# Coleta de preços atuais e futuros
+# Preços
 entry_price = data["close"].iloc[-1]
-future_high = data["high"].iloc[-1]    # OU .iloc[-2] se já passou
+future_high = data["high"].iloc[-1]
 future_low = data["low"].iloc[-1]
 was_sent = trade_signal in ["BUY", "SELL"]
 
-# Log completo com simulação de resultado
+# Log completo
 log_to_csv(
     trade_signal, sl, tp, trend_signal, sentiment_signal,
     entry_price, was_sent, future_high, future_low
 )
 
-# Exibição do sinal
+# Exibição
 st.subheader("📊 Sinal Gerado")
 st.markdown(f"**Trade Signal:** `{trade_signal}`")
 st.markdown(f"**Stop Loss:** `{sl}` | **Take Profit:** `{tp}`")
 st.markdown(f"**Trend Signal:** `{trend_signal}`")
 st.markdown(f"**Sentiment Signal:** `{sentiment_signal}`")
 
-# Gráfico de candle
+# Gráfico
 fig = go.Figure()
 fig.add_trace(go.Candlestick(
     x=data['time'],
@@ -99,9 +100,17 @@ else:
 st.markdown("---")
 st.header("📈 Histórico de Sinais")
 
-if os.path.exists("signals_log.csv"):
-    df_log = pd.read_csv("db/signals_log.csv")
-    df_log["Timestamp"] = pd.to_datetime(df_log["Timestamp"])
+log_file = "db/signals_log.csv"
+
+try:
+    df_log = pd.read_csv(log_file)
+except (pd.errors.EmptyDataError, pd.errors.ParserError):
+    st.warning("⚠️ Erro ao carregar o arquivo de log.")
+    df_log = pd.DataFrame()
+
+if not df_log.empty:
+    if "Timestamp" in df_log.columns:
+        df_log["Timestamp"] = pd.to_datetime(df_log["Timestamp"])
 
     filtro = st.selectbox("📌 Filtrar por tipo de sinal:", options=["Todos", "BUY", "SELL", "WAIT"])
     if filtro != "Todos":
@@ -125,7 +134,7 @@ if os.path.exists("signals_log.csv"):
     col3.metric("Taxa de Envio (%)", por_envio)
     col4.metric("BUY / SELL / WAIT", f"{buy_count} / {sell_count} / {wait_count}")
 else:
-    st.warning("Nenhum log de sinal encontrado.")
+    st.warning("📭 Nenhum sinal registrado ainda.")
 
 # ============================
 # 🧪 BACKTEST COM CAPITAL REAL
@@ -134,20 +143,18 @@ else:
 st.markdown("---")
 st.header("🧪 Backtest Simulado (Retorno Real)")
 
-if os.path.exists("signals_log.csv"):
-    df_bt = pd.read_csv("signals_log.csv")
-    df_bt = df_bt[df_bt["Signal"].isin(["BUY", "SELL"])]
-    df_bt["Timestamp"] = pd.to_datetime(df_bt["Timestamp"])
-
+if not df_log.empty and "Capital" in df_log.columns:
     st.subheader("📈 Curva de Capital")
-    st.line_chart(df_bt["Capital"])
+    st.line_chart(df_log["Capital"])
 
-    wins = len(df_bt[df_bt["Return (%)"] > 0])
-    losses = len(df_bt[df_bt["Return (%)"] < 0])
+    df_trades = df_log[df_log["Signal"].isin(["BUY", "SELL"])]
+
+    wins = len(df_trades[df_trades["Return (%)"] > 0])
+    losses = len(df_trades[df_trades["Return (%)"] < 0])
     total_bt = wins + losses
     winrate = round(wins / total_bt * 100, 2) if total_bt else 0
-    capital_final = df_bt["Capital"].iloc[-1] if total_bt else 10000
-    capital_inicial = df_bt["Capital"].iloc[0] if total_bt else 10000
+    capital_final = df_trades["Capital"].iloc[-1] if total_bt else 10000
+    capital_inicial = df_trades["Capital"].iloc[0] if total_bt else 10000
     lucro_total = round(capital_final - capital_inicial, 2)
 
     col1, col2, col3 = st.columns(3)
@@ -155,4 +162,4 @@ if os.path.exists("signals_log.csv"):
     col2.metric("Winrate (%)", winrate)
     col3.metric("Lucro Acumulado", f"{lucro_total}")
 else:
-    st.warning("Sem dados suficientes para backtest.")
+    st.warning("⚠️ Ainda não há dados suficientes para simular o backtest.")

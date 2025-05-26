@@ -22,7 +22,7 @@ def run():
     try:
         data = fetch_eurusd_data()
         trend = get_trend_signal(data)
-        sentiment = get_sentiment_signal()
+        sentiment= get_sentiment_signal(df)
         signal = generate_trade_signal(trend, sentiment)
         sl, tp = calculate_sl_tp(data)
 

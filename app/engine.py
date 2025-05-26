@@ -4,10 +4,11 @@ import os
 import streamlit as st
 from datetime import datetime
 import csv
+from supabase import create_client, Client
 
-# ==============================
-# 📥 BUSCAR DADOS DA API
-# ==============================
+# ============================
+# 📥 DADOS API
+# ============================
 
 def fetch_eurusd_data():
     api_key = st.secrets["TWELVE_DATA_API_KEY"]
@@ -37,16 +38,16 @@ def fetch_eurusd_data():
     df = df.sort_values("time")
     return df
 
-# ==============================
-# 📈 LÓGICA DE SINAL
-# ==============================
+# ============================
+# 🎯 LÓGICA DE SINAL
+# ============================
 
 def get_trend_signal(df):
     df['ma'] = df['close'].rolling(10).mean()
     return "uptrend" if df['close'].iloc[-1] > df['ma'].iloc[-1] else "downtrend"
 
 def get_sentiment_signal():
-    return "bullish"  # placeholder
+    return "bullish"  # Placeholder
 
 def generate_trade_signal(trend, sentiment):
     if trend == "uptrend" and sentiment == "bullish":
@@ -59,27 +60,23 @@ def calculate_sl_tp_price(df):
     close = df['close'].iloc[-1]
     return round(close * 0.995, 5), round(close * 1.005, 5)
 
-# ==============================
-# 📝 LOG BÁSICO
-# ==============================
+# ============================
+# 🧠 SUPABASE LOG
+# ============================
 
 def log_signal(signal, sl, tp):
     with open("logs.txt", "a") as f:
         f.write(f"{datetime.now()} | {signal} | SL: {sl} | TP: {tp}\n")
 
-# ==============================
-# 📊 LOG COMPLETO EM CSV
-# ==============================
-
-def log_to_csv(
+def log_to_supabase(
     signal, sl, tp, trend, sentiment,
     entry_price, was_sent, future_high, future_low,
     initial_capital=10000, risk_percent=1.0
 ):
-    file = "db/signals_log.csv"
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(url, key)
 
-    # 🎯 Determina se atingiu SL ou TP
     hit = "None"
     if signal == "BUY":
         if future_high >= tp:
@@ -92,7 +89,6 @@ def log_to_csv(
         elif future_high >= sl:
             hit = "SL"
 
-    # 📈 Cálculo de retorno
     rr_ratio = abs(tp - entry_price) / abs(sl - entry_price) if abs(sl - entry_price) != 0 else 1
     retorno_pct = 0
     if hit == "TP":
@@ -100,36 +96,29 @@ def log_to_csv(
     elif hit == "SL":
         retorno_pct = -risk_percent
 
-    # 💰 Simulação de capital acumulado
-    capital = initial_capital
-    if os.path.exists(file):
-        try:
-            df = pd.read_csv(file)
-            if not df.empty and "Capital" in df.columns:
-                capital = df["Capital"].iloc[-1]
-        except (pd.errors.EmptyDataError, pd.errors.ParserError):
-            df = pd.DataFrame()
+    try:
+        result = supabase.table("signals_log").select("*").order("timestamp", desc=True).limit(1).execute()
+        if result.data:
+            capital = result.data[0]["capital"]
+        else:
+            capital = initial_capital
+    except Exception:
+        capital = initial_capital
 
     capital += capital * (retorno_pct / 100)
 
-    # 🧾 Monta linha do log
-    row = {
-        "Timestamp": timestamp,
-        "Signal": signal,
-        "SL": sl,
-        "TP": tp,
-        "Trend": trend,
-        "Sentiment": sentiment,
-        "Price": entry_price,
-        "Hit": hit,
-        "Return (%)": round(retorno_pct, 2),
-        "Capital": round(capital, 2),
-        "Sent": "Yes" if was_sent else "No"
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "signal": signal,
+        "sl": sl,
+        "tp": tp,
+        "trend": trend,
+        "sentiment": sentiment,
+        "price": entry_price,
+        "hit": hit,
+        "return_pct": round(retorno_pct, 2),
+        "capital": round(capital, 2),
+        "sent": "Yes" if was_sent else "No"
     }
 
-    file_exists = os.path.exists(file)
-    with open(file, mode="a", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=row.keys())
-        if not file_exists:
-            writer.writeheader()
-        writer.writerow(row)
+    supabase.table("signals_log").insert(data).execute()

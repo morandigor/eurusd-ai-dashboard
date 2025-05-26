@@ -1,53 +1,37 @@
-import pandas as pd
-import requests
 import os
-import streamlit as st
+import requests
 from datetime import datetime
-import csv
+import pandas as pd
 from supabase import create_client, Client
 
-# ============================
-# 📥 DADOS API
-# ============================
+# Load secrets via environment variables
+TWELVE_DATA_API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# === Signal Engine ===
 def fetch_eurusd_data():
-    api_key = st.secrets["TWELVE_DATA_API_KEY"]
-    url = (
-        f"https://api.twelvedata.com/time_series?"
-        f"symbol=EUR/USD&interval=1h&outputsize=100&apikey={api_key}"
-    )
-
-    response = requests.get(url)
-    data = response.json()
-
+    url = f"https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=15min&apikey={TWELVE_DATA_API_KEY}&outputsize=100"
+    r = requests.get(url)
+    data = r.json()
     if "values" not in data:
-        st.error("❌ Erro ao buscar dados na Twelve Data")
-        st.json(data)
-        st.stop()
-
+        raise Exception(f"Erro na API Twelve Data: {data}")
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
-    df = df.rename(columns={
-        "datetime": "time",
-        "open": "open",
-        "high": "high",
-        "low": "low",
-        "close": "close"
-    })
-    df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].astype(float)
-    df = df.sort_values("time")
+    df = df.sort_values("datetime")
+    df.set_index("datetime", inplace=True)
+    df = df.astype(float)
     return df
 
-# ============================
-# 🎯 LÓGICA DE SINAL
-# ============================
-
 def get_trend_signal(df):
-    df['ma'] = df['close'].rolling(10).mean()
-    return "uptrend" if df['close'].iloc[-1] > df['ma'].iloc[-1] else "downtrend"
+    df["ema20"] = df["close"].ewm(span=20).mean()
+    df["ema50"] = df["close"].ewm(span=50).mean()
+    return "uptrend" if df["ema20"].iloc[-1] > df["ema50"].iloc[-1] else "downtrend"
 
-def get_sentiment_signal():
-    return "bullish"  # Placeholder
+def get_sentiment_signal(df):
+    return "bullish" if df["close"].iloc[-1] > df["open"].iloc[-1] else "bearish"
 
 def generate_trade_signal(trend, sentiment):
     if trend == "uptrend" and sentiment == "bullish":
@@ -56,59 +40,40 @@ def generate_trade_signal(trend, sentiment):
         return "SELL"
     return "WAIT"
 
-def calculate_sl_tp_price(df):
-    close = df['close'].iloc[-1]
-    return round(close * 0.995, 5), round(close * 1.005, 5)
-
-# ============================
-# 🧠 SUPABASE LOG
-# ============================
-
-def log_signal(signal, sl, tp):
-    with open("logs.txt", "a") as f:
-        f.write(f"{datetime.now()} | {signal} | SL: {sl} | TP: {tp}\n")
-
-def log_to_supabase(
-    signal, sl, tp, trend, sentiment,
-    entry_price, was_sent, future_high, future_low,
-    initial_capital=10000, risk_percent=1.0
-):
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    supabase: Client = create_client(url, key)
-
-    hit = "None"
+def calculate_sl_tp_price(signal, price):
     if signal == "BUY":
-        if future_high >= tp:
-            hit = "TP"
-        elif future_low <= sl:
-            hit = "SL"
+        return round(price * 0.995, 5), round(price * 1.01, 5)
     elif signal == "SELL":
-        if future_low <= tp:
-            hit = "TP"
-        elif future_high >= sl:
-            hit = "SL"
+        return round(price * 1.005, 5), round(price * 0.99, 5)
+    return 0, 0
 
-    rr_ratio = abs(tp - entry_price) / abs(sl - entry_price) if abs(sl - entry_price) != 0 else 1
-    retorno_pct = 0
-    if hit == "TP":
-        retorno_pct = risk_percent * rr_ratio
-    elif hit == "SL":
-        retorno_pct = -risk_percent
+def log_signal(signal, sl, tp, trend, sentiment, entry_price, sent, future_high=None, future_low=None):
+    timestamp = datetime.utcnow().isoformat()
+    hit = "pending"
+    return_pct = 0
+    capital = 1000
 
-    try:
-        result = supabase.table("signals_log").select("*").order("timestamp", desc=True).limit(1).execute()
-        if result.data:
-            capital = result.data[0]["capital"]
+    if signal == "BUY" and future_high and future_low:
+        if future_high >= tp:
+            hit = "tp"
+            return_pct = 1.0
+        elif future_low <= sl:
+            hit = "sl"
+            return_pct = -0.5
         else:
-            capital = initial_capital
-    except Exception:
-        capital = initial_capital
-
-    capital += capital * (retorno_pct / 100)
+            hit = "none"
+    elif signal == "SELL" and future_high and future_low:
+        if future_low <= tp:
+            hit = "tp"
+            return_pct = 1.0
+        elif future_high >= sl:
+            hit = "sl"
+            return_pct = -0.5
+        else:
+            hit = "none"
 
     data = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": timestamp,
         "signal": signal,
         "sl": sl,
         "tp": tp,
@@ -116,16 +81,56 @@ def log_to_supabase(
         "sentiment": sentiment,
         "price": entry_price,
         "hit": hit,
-        "return_pct": round(retorno_pct, 2),
-        "capital": round(capital, 2),
-        "sent": "Yes" if was_sent else "No"
+        "return_pct": return_pct,
+        "capital": capital,
+        "sent": sent
     }
-
     supabase.table("signals_log").insert(data).execute()
 
 def get_logs_from_supabase():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    supabase: Client = create_client(url, key)
-    data = supabase.table("signals_log").select("*").order("timestamp", desc=True).execute()
-    return pd.DataFrame(data.data)
+    response = supabase.table("signals_log").select("*").order("timestamp", desc=True).limit(100).execute()
+    return pd.DataFrame(response.data)
+
+def log_to_csv(signal, sl, tp, trend, sentiment, entry_price, was_sent, future_high, future_low):
+    file = "db/signals_log.csv"
+    if os.path.exists(file):
+        df = pd.read_csv(file)
+    else:
+        df = pd.DataFrame(columns=["timestamp", "signal", "sl", "tp", "trend", "sentiment", "price", "hit", "return_pct", "capital", "sent"])
+
+    timestamp = datetime.utcnow().isoformat()
+    hit = "none"
+    return_pct = 0
+    capital = 1000
+
+    if signal == "BUY":
+        if future_high >= tp:
+            hit = "tp"
+            return_pct = 1.0
+        elif future_low <= sl:
+            hit = "sl"
+            return_pct = -0.5
+    elif signal == "SELL":
+        if future_low <= tp:
+            hit = "tp"
+            return_pct = 1.0
+        elif future_high >= sl:
+            hit = "sl"
+            return_pct = -0.5
+
+    new_row = {
+        "timestamp": timestamp,
+        "signal": signal,
+        "sl": sl,
+        "tp": tp,
+        "trend": trend,
+        "sentiment": sentiment,
+        "price": entry_price,
+        "hit": hit,
+        "return_pct": return_pct,
+        "capital": capital,
+        "sent": was_sent
+    }
+
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    df.to_csv(file, index=False)

@@ -27,7 +27,7 @@ def fetch_eurusd_data():
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime")
-    df[["open", "high", "low", "close", "volume"]] = df[["open", "high", "low", "close", "volume"]].astype(float)
+    df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].astype(float)
     df = df.set_index("datetime")
     return df
 

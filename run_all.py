@@ -1,6 +1,6 @@
 from collectors import price, economic_events, cot_report, sentiment, news
 from dashboard.engine import generate_trade_signal
-from alerts.telegram import send_alert
+from app.telegram import send_alert
 from dotenv import load_dotenv
 import os
 

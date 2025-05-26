@@ -1,17 +1,16 @@
-import streamlit as st  # First import
-st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # Must be second
+# FIRST: Streamlit page config
+import streamlit as st
+st.set_page_config(page_title="EUR/USD AI Dashboard", layout="wide")  # ✅ Must be very first Streamlit command
 
 # Other imports
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from dotenv import load_dotenv
-import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from dotenv import load_dotenv
 
-
-from engine import (
+# App modules
+from app.engine import (
     fetch_eurusd_data,
     get_trend_signal,
     get_sentiment_signal,

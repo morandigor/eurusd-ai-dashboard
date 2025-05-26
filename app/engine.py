@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 import os
 from datetime import datetime
+import streamlit as st  # necessário para exibir erros visuais
 
 def fetch_eurusd_data():
     api_key = os.getenv("TWELVE_DATA_API_KEY")
@@ -14,8 +15,11 @@ def fetch_eurusd_data():
     response = requests.get(url)
     data = response.json()
 
+    # ⛔ Exibe erro no Streamlit se a API falhar
     if "values" not in data:
-        raise Exception(f"Erro na API Twelve Data: {data}")
+        st.error("❌ Erro ao buscar dados na Twelve Data")
+        st.json(data)  # Mostra o erro retornado pela API
+        st.stop()
 
     df = pd.DataFrame(data["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
@@ -32,28 +36,21 @@ def fetch_eurusd_data():
 
 def get_trend_signal(df):
     df['ma'] = df['close'].rolling(10).mean()
-    if df['close'].iloc[-1] > df['ma'].iloc[-1]:
-        return "uptrend"
-    else:
-        return "downtrend"
+    return "uptrend" if df['close'].iloc[-1] > df['ma'].iloc[-1] else "downtrend"
 
 def get_sentiment_signal():
-    # Placeholder fixo
-    return "bullish"
+    return "bullish"  # placeholder
 
 def generate_trade_signal(trend, sentiment):
     if trend == "uptrend" and sentiment == "bullish":
         return "BUY"
     elif trend == "downtrend" and sentiment == "bearish":
         return "SELL"
-    else:
-        return "WAIT"
+    return "WAIT"
 
 def calculate_sl_tp_price(df):
     close = df['close'].iloc[-1]
-    sl = round(close * 0.995, 5)
-    tp = round(close * 1.005, 5)
-    return sl, tp
+    return round(close * 0.995, 5), round(close * 1.005, 5)
 
 def log_signal(signal, sl, tp):
     with open("logs.txt", "a") as f:

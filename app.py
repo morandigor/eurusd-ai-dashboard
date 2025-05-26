@@ -120,3 +120,36 @@ if os.path.exists("signals_log.csv"):
     col4.metric("Sinais BUY / SELL / WAIT", f"{buy_count} / {sell_count} / {wait_count}")
 else:
     st.warning("Nenhum log de sinal encontrado ainda.")
+# ============================
+# 🧪 BACKTEST SIMULADO
+# ============================
+
+st.markdown("---")
+st.header("🧪 Backtest Simulado (Baseado no Log)")
+
+if os.path.exists("signals_log.csv"):
+    df_bt = pd.read_csv("signals_log.csv")
+    df_bt = df_bt[df_bt["Signal"].isin(["BUY", "SELL"])]
+    df_bt["Result"] = df_bt["Signal"].apply(lambda x: 1 if x == "BUY" else -1)  # simplificação
+
+    # Simulando retorno bruto
+    df_bt["Cumulative Return"] = df_bt["Result"].cumsum()
+
+    # 📈 Equity Curve
+    st.subheader("📈 Curva de Retorno Acumulado")
+    st.line_chart(df_bt["Cumulative Return"])
+
+    # 🧮 Métricas
+    wins = len(df_bt[df_bt["Result"] == 1])
+    losses = len(df_bt[df_bt["Result"] == -1])
+    total = wins + losses
+    winrate = round(wins / total * 100, 2) if total else 0
+    net = df_bt["Cumulative Return"].iloc[-1] if total else 0
+
+    st.subheader("📊 Estatísticas do Backtest")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Trades", total)
+    col2.metric("Winrate (%)", f"{winrate}")
+    col3.metric("Lucro Acumulado", f"{net}")
+else:
+    st.warning("Nenhum dado encontrado para simular backtest.")
